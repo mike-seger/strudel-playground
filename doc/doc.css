@@ -1,0 +1,151 @@
+/* ── Reset & base ───────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { height: 100%; }
+body {
+  min-height: 100%;
+  font-family: system-ui, -apple-system, sans-serif;
+  background: #1e1e2e;
+  color: #cdd6f4;
+  line-height: 1.7;
+  color-scheme: dark;
+}
+
+/* ── Layout ────────────────────────────────────────────── */
+#doc-container {
+  display: flex;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+  gap: 32px;
+}
+
+/* ── Side navigation ───────────────────────────────────── */
+#doc-nav {
+  position: sticky;
+  top: 40px;
+  flex-shrink: 0;
+  width: 180px;
+  max-height: calc(100vh - 80px);
+  overflow-y: auto;
+  padding-right: 16px;
+  border-right: 1px solid #313244;
+}
+#doc-nav a {
+  display: block;
+  padding: 4px 0;
+  font-size: 13px;
+  color: #6c7086;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+#doc-nav a:hover { color: #cdd6f4; }
+#doc-nav a.active { color: #89b4fa; }
+#doc-nav .nav-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #cdd6f4;
+  margin-bottom: 8px;
+}
+
+/* ── Article content ───────────────────────────────────── */
+#doc-content {
+  flex: 1;
+  min-width: 0;
+}
+
+#doc-content h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #cdd6f4;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #313244;
+}
+#doc-content h2 {
+  font-size: 22px;
+  font-weight: 600;
+  color: #cdd6f4;
+  margin-top: 40px;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #313244;
+}
+#doc-content h3 {
+  font-size: 17px;
+  font-weight: 600;
+  color: #bac2de;
+  margin-top: 28px;
+  margin-bottom: 8px;
+}
+
+#doc-content p { margin-bottom: 12px; }
+
+#doc-content a {
+  color: #89b4fa;
+  text-decoration: none;
+}
+#doc-content a:hover { text-decoration: underline; }
+
+#doc-content ul, #doc-content ol {
+  margin: 8px 0 16px 24px;
+}
+#doc-content li { margin-bottom: 4px; }
+
+#doc-content code {
+  font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+  font-size: 0.9em;
+  background: #313244;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #cdd6f4;
+}
+
+#doc-content pre {
+  background: #181825;
+  border: 1px solid #313244;
+  border-radius: 6px;
+  padding: 16px;
+  overflow-x: auto;
+  margin-bottom: 16px;
+}
+
+#doc-content pre code {
+  background: transparent;
+  padding: 0;
+}
+
+#doc-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 12px 0 20px;
+  font-size: 14px;
+}
+#doc-content th, #doc-content td {
+  text-align: left;
+  padding: 8px 12px;
+  border-bottom: 1px solid #313244;
+}
+#doc-content th {
+  color: #6c7086;
+  font-weight: 600;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+#doc-content kbd {
+  display: inline-block;
+  padding: 2px 6px;
+  font-size: 0.85em;
+  font-family: inherit;
+  background: #313244;
+  border: 1px solid #45475a;
+  border-radius: 4px;
+  color: #cdd6f4;
+}
+
+/* ── Scrollbars ────────────────────────────────────────── */
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: #181825; }
+::-webkit-scrollbar-thumb { background: #313244; border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: #6c7086; }
