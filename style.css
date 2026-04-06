@@ -252,6 +252,8 @@ body > canvas {
 
 #play-btn.playing {
   color: #f38ba8;
+  position: relative;
+  top: -2px;
 }
 
 #play-btn.playing:hover {
