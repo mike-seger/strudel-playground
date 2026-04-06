@@ -5,6 +5,7 @@
 [Strudel](https://strudel.cc) by Felix Roos brings the ideas of [TidalCycles](https://tidalcycles.org) by Alex McLean to the browser. The pattern language, the web component, and the whole approach of making live-coding accessible without installation is what makes this playground possible. Thank you for building such a joyful tool.
 
 - [Strudel documentation](https://strudel.cc/learn)
+- [Strudel Getting Started](https://strudel.cc/workshop/getting-started/)
 - [TidalCycles](https://tidalcycles.org)
 
 ### CodeMirror

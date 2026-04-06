@@ -4,16 +4,28 @@ import path from 'path';
 
 function generateSongsIndex() {
   const dir = path.resolve(__dirname, 'strudels');
-  const files = fs.readdirSync(dir)
-    .filter(f => f.endsWith('.js') && f !== 'index.js')
-    .sort();
-  const entries = files.map(f => `  { path: "./${f}" },`).join('\n');
+  const results = [];
+
+  function scan(folder, prefix) {
+    const entries = fs.readdirSync(folder, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name));
+    for (const e of entries) {
+      if (e.isDirectory()) {
+        scan(path.join(folder, e.name), prefix ? prefix + '/' + e.name : e.name);
+      } else if (e.name.endsWith('.js') && e.name !== 'index.js') {
+        const rel = prefix ? `./${prefix}/${e.name}` : `./${e.name}`;
+        results.push(rel);
+      }
+    }
+  }
+  scan(dir, '');
+
+  const entries = results.map(f => `  { path: "${f}" },`).join('\n');
   const content = `export const songs = [\n${entries}\n];\n`;
   const indexPath = path.join(dir, 'index.js');
   const existing = fs.existsSync(indexPath) ? fs.readFileSync(indexPath, 'utf-8') : '';
   if (content !== existing) {
     fs.writeFileSync(indexPath, content);
-    console.log(`[songs] regenerated index.js (${files.length} songs)`);
+    console.log(`[songs] regenerated index.js (${results.length} songs)`);
   }
 }
 

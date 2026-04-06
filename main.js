@@ -7,44 +7,6 @@ import { defaultKeymap, indentWithTab } from '@codemirror/commands';
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
 import { closeBrackets } from '@codemirror/autocomplete';
 
-// ── Patch fetch to fix broken JSON (trailing/missing commas) ──
-const _fetch = window.fetch;
-window.fetch = async function (...args) {
-  const resp = await _fetch.apply(this, args);
-  const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
-  if (url.endsWith('.json') || /\.json\?/.test(url)) {
-    const clone = resp.clone();
-    resp.json = async () => {
-      let text = await clone.text();
-      try {
-        return JSON.parse(text);
-      } catch {
-        // Step 1: strip trailing commas before ] or }
-        text = text.replace(/,(\s*[\]}])/g, '$1');
-        // Step 2: iteratively insert missing commas
-        for (let i = 0; i < 50; i++) {
-          try {
-            return JSON.parse(text);
-          } catch (e) {
-            const m = e.message.match(/position (\d+)/);
-            if (!m) throw e;
-            const p = parseInt(m[1]);
-            let j = p - 1;
-            while (j >= 0 && /\s/.test(text[j])) j--;
-            const last = text[j], next = text[p];
-            if ((last === ']' || last === '"') && (next === '"' || next === '[')) {
-              text = text.substring(0, j + 1) + ',' + text.substring(j + 1);
-            } else {
-              throw e;
-            }
-          }
-        }
-      }
-    };
-  }
-  return resp;
-};
-
 const songList = document.getElementById('song-list');
 const playBtn = document.getElementById('play-btn');
 const applyBtn = document.getElementById('apply-btn');
@@ -210,10 +172,6 @@ function initUI() {
   }
 }
 
-// Track collapsed state per folder across re-renders
-const collapsedFolders = new Set(); // Start empty; folders default to collapsed unless explicitly expanded
-const expandedFolders = new Set();
-
 function renderSongList(filter) {
   songList.innerHTML = '';
   let re;
@@ -222,66 +180,18 @@ function renderSongList(filter) {
   } catch {
     re = null;
   }
-
-  // Derive folder from path: "./foo/bar.js" → "foo", "./baz.js" → ""
-  function folderOf(song) {
-    const p = song.path.replace(/^\.\//, '');
-    const slash = p.lastIndexOf('/');
-    return slash === -1 ? '' : p.substring(0, slash);
-  }
-
-  // Group songs by folder, preserving alphabetical sort within each group
-  const groups = new Map(); // folder → songs[]
   sortedSongs.forEach((song) => {
     if (re && !re.test(song.name)) return;
-    const folder = folderOf(song);
-    if (!groups.has(folder)) groups.set(folder, []);
-    groups.get(folder).push(song);
-  });
-
-  // Sort folder keys: root ("") first, then alphabetical
-  const folders = [...groups.keys()].sort((a, b) => {
-    if (a === '') return -1;
-    if (b === '') return 1;
-    return a.localeCompare(b);
-  });
-
-  for (const folder of folders) {
-    const isFolder = folder !== '';
-    // Default collapsed unless explicitly expanded
-    const collapsed = isFolder && !expandedFolders.has(folder);
-
-    if (isFolder) {
-      const header = document.createElement('li');
-      header.className = 'folder-header';
-      if (collapsed) header.classList.add('collapsed');
-      header.innerHTML = `<span class="folder-arrow">${collapsed ? '▸' : '▾'}</span> ${folder}`;
-      header.addEventListener('click', () => {
-        if (expandedFolders.has(folder)) {
-          expandedFolders.delete(folder);
-        } else {
-          expandedFolders.add(folder);
-        }
-        renderSongList(songFilter.value);
-      });
-      songList.appendChild(header);
+    const li = document.createElement('li');
+    li.textContent = song.name;
+    li.dataset.index = song.originalIndex;
+    li.addEventListener('click', () => selectSong(song.originalIndex, li));
+    if (activeLi && activeLi.dataset.index === li.dataset.index) {
+      li.classList.add('active');
+      activeLi = li;
     }
-
-    if (isFolder && collapsed) continue;
-
-    for (const song of groups.get(folder)) {
-      const li = document.createElement('li');
-      li.textContent = song.name;
-      li.dataset.index = song.originalIndex;
-      if (isFolder) li.classList.add('in-folder');
-      li.addEventListener('click', () => selectSong(song.originalIndex, li));
-      if (activeLi && activeLi.dataset.index === li.dataset.index) {
-        li.classList.add('active');
-        activeLi = li;
-      }
-      songList.appendChild(li);
-    }
-  }
+    songList.appendChild(li);
+  });
 }
 
 const songFilter = document.getElementById('song-filter');
@@ -299,7 +209,7 @@ function handleSidebarNav(e) {
   e.stopPropagation();
   if (navDebounce) return;
   navDebounce = setTimeout(() => { navDebounce = null; }, 150);
-  const items = Array.from(songList.querySelectorAll('li:not(.folder-header)'));
+  const items = Array.from(songList.querySelectorAll('li'));
   if (items.length === 0) return;
   const activeIdx = items.findIndex((li) => li.classList.contains('active'));
   let nextIdx;
@@ -321,14 +231,25 @@ function selectSong(index, li) {
   // Skip if already on this song
   if (currentSongIndex === index) return;
   const wasPlaying = playing;
-  if (wasPlaying) stop();
+  // Full stop: destroy the old repl on song switch
+  if (playing || paused) {
+    const el = document.getElementById('repl');
+    if (el?.editor) try { el.editor.stop(); } catch {}
+  }
+  resetProgressLoop();
+  playing = false;
+  paused = false;
+  playBtn.classList.remove('playing');
+  playIcon.innerHTML = '&#9654;';
+  statusEl.textContent = 'Stopped';
+
   if (activeLi) activeLi.classList.remove('active');
   li.classList.add('active');
   activeLi = li;
   currentSongIndex = index;
   localStorage.setItem(SONG_KEY, index);
   setEditorCode(songs[index].code);
-  // Pre-load code into a fresh repl
+  // Fresh repl for the new song
   createRepl(songs[index].code);
   if (wasPlaying) {
     setTimeout(() => play(), 200);
@@ -338,13 +259,15 @@ function selectSong(index, li) {
 // ── Apply: push editor code into the strudel repl ──
 function applyCode() {
   const code = getEditorCode();
-  // Recreate the repl with new code to ensure clean state
-  const replEl = createRepl(code);
-  if (playing) {
-    setTimeout(() => {
-      const ed = replEl.editor;
-      if (ed) ed.evaluate();
-    }, 200);
+  const el = document.getElementById('repl');
+  const editor = el?.editor;
+  if (editor && playing) {
+    // Hot-swap code without destroying the repl
+    editor.setCode(code);
+    editor.evaluate();
+  } else {
+    // Not playing — recreate repl with new code
+    createRepl(code);
   }
 }
 
@@ -353,7 +276,7 @@ const progressSlider = document.getElementById('progress');
 const elapsedEl = document.getElementById('elapsed');
 let progressRAF = null;
 let playStartTime = 0;
-let seekOffset = 0;
+let pausedElapsed = 0;
 let isSeeking = false;
 
 function formatTime(ms) {
@@ -363,37 +286,30 @@ function formatTime(ms) {
   return m + ':' + String(sec).padStart(2, '0');
 }
 
-// Seeking: when user drags or clicks, restart playback from that offset
+// Seeking: when user drags or clicks, adjust the elapsed timer
 progressSlider.addEventListener('input', () => {
   isSeeking = true;
 });
 
 progressSlider.addEventListener('change', () => {
-  if (!playing) {
-    isSeeking = false;
-    return;
-  }
-  // Treat the slider as 0–1000 mapping to 0–10 minutes
   const maxMs = 10 * 60 * 1000;
   const seekMs = (parseInt(progressSlider.value) / 1000) * maxMs;
   playStartTime = Date.now() - seekMs;
-  seekOffset = seekMs;
+  pausedElapsed = seekMs;
   isSeeking = false;
-  // Re-evaluate to restart the pattern
-  const el = document.getElementById('repl');
-  const editor = el?.editor;
-  if (editor) editor.evaluate();
 });
 
-function startProgressLoop() {
-  playStartTime = Date.now();
-  seekOffset = 0;
-  progressSlider.value = 0;
+function startProgressLoop(resume) {
+  if (resume) {
+    playStartTime = Date.now() - pausedElapsed;
+  } else {
+    playStartTime = Date.now();
+    pausedElapsed = 0;
+    progressSlider.value = 0;
+  }
   const maxMs = 10 * 60 * 1000;
   const tick = () => {
-    if (!playing) {
-      return;
-    }
+    if (!playing) return;
     if (!isSeeking) {
       const elapsed = Date.now() - playStartTime;
       elapsedEl.textContent = formatTime(elapsed);
@@ -404,20 +320,28 @@ function startProgressLoop() {
   progressRAF = requestAnimationFrame(tick);
 }
 
-function stopProgressLoop() {
+function pauseProgressLoop() {
+  pausedElapsed = Date.now() - playStartTime;
   if (progressRAF) cancelAnimationFrame(progressRAF);
   progressRAF = null;
+}
+
+function resetProgressLoop() {
+  if (progressRAF) cancelAnimationFrame(progressRAF);
+  progressRAF = null;
+  pausedElapsed = 0;
   progressSlider.value = 0;
   elapsedEl.textContent = '0:00';
 }
 
 // ── Playback controls ──
-function play() {
-  const code = getEditorCode();
-  const replEl = document.getElementById('repl');
-  if (!replEl) createRepl(code);
-  else replEl.setAttribute('code', code);
+let paused = false;
 
+function play() {
+  const replEl = document.getElementById('repl');
+  if (!replEl) createRepl(getEditorCode());
+
+  const resume = paused;
   const tryEval = () => {
     const el = document.getElementById('repl');
     const editor = el?.editor;
@@ -429,23 +353,25 @@ function play() {
   };
   setTimeout(tryEval, 100);
   playing = true;
+  paused = false;
   playBtn.classList.add('playing');
   playIcon.innerHTML = '&#9646;&#9646;';
-  statusEl.textContent = 'Playing';
-  startProgressLoop();
+  statusEl.textContent = resume ? 'Resumed' : 'Playing';
+  startProgressLoop(resume);
 }
 
 function stop() {
-  stopProgressLoop();
-  destroyRepl();
+  const el = document.getElementById('repl');
+  const editor = el?.editor;
+  if (editor) {
+    try { editor.stop(); } catch {}
+  }
+  pauseProgressLoop();
   playing = false;
+  paused = true;
   playBtn.classList.remove('playing');
   playIcon.innerHTML = '&#9654;';
-  statusEl.textContent = 'Stopped';
-  // Recreate with current code so pattern display is ready
-  if (currentSongIndex >= 0) {
-    createRepl(getEditorCode());
-  }
+  statusEl.textContent = 'Paused';
 }
 
 playBtn.addEventListener('click', () => {
