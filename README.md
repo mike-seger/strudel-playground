@@ -38,4 +38,4 @@ See [doc/code-license.md](doc/code-license.md).
 
 ## Documentation
 
-Full documentation is available at [doc/index.html](doc/index.html).
+Full documentation is available under **About** in the app.
