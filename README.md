@@ -1,8 +1,7 @@
 # Strudel Playground
 
 Click on the image to open the app:
-
-[![Strudel Playground](playground.png)](https://mike-seger.github.io/strudel-playground/))
+[![Strudel Playground](playground.png)](https://mike-seger.github.io/strudel-playground/)
 
 A browser-based live-coding music playground built on [Strudel](https://strudel.cc/) with a CodeMirror 6 editor, dark theme, and a curated collection of songs.
 
