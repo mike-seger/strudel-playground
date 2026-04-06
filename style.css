@@ -244,6 +244,15 @@ body > canvas {
   color: var(--accent-hover);
 }
 
+.transport-btn {
+  font-size: 12px !important;
+  opacity: 0.7;
+  transition: opacity 0.15s, color 0.15s;
+}
+.transport-btn:hover {
+  opacity: 1;
+}
+
 #play-btn.playing {
   color: #f38ba8;
 }

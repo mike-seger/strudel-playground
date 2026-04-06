@@ -48,6 +48,8 @@ window.fetch = async function (...args) {
 const songList = document.getElementById('song-list');
 const playBtn = document.getElementById('play-btn');
 const applyBtn = document.getElementById('apply-btn');
+const ffBtn = document.getElementById('ff-btn');
+const rwBtn = document.getElementById('rw-btn');
 const playIcon = document.getElementById('play-icon');
 const statusEl = document.getElementById('status');
 
@@ -381,10 +383,8 @@ progressSlider.addEventListener('change', () => {
   playStartTime = Date.now() - seekMs;
   seekOffset = seekMs;
   isSeeking = false;
-  // Re-evaluate to restart the pattern
-  const el = document.getElementById('repl');
-  const editor = el?.editor;
-  if (editor) editor.evaluate();
+  // Seek the cyclist to the matching cycle position
+  seekToCycleFromMs(seekMs);
 });
 
 function startProgressLoop() {
@@ -455,6 +455,51 @@ playBtn.addEventListener('click', () => {
 });
 
 applyBtn.addEventListener('click', applyCode);
+
+// ── Fast-forward / Rewind ──
+const SKIP_CYCLES = 4;
+
+function getScheduler() {
+  const el = document.getElementById('repl');
+  return el?.editor?.repl?.scheduler;
+}
+
+function seekToCycle(target) {
+  const scheduler = getScheduler();
+  if (!scheduler) return;
+  target = Math.max(0, target);
+  if (typeof scheduler.setCycle === 'function') {
+    scheduler.setCycle(target);
+  } else {
+    scheduler.clock.stop();
+    scheduler.lastEnd = target;
+    scheduler.lastBegin = target;
+    scheduler.num_ticks_since_cps_change = 0;
+    scheduler.num_cycles_at_cps_change = target;
+    scheduler.clock.start();
+  }
+}
+
+function seekToCycleFromMs(ms) {
+  const scheduler = getScheduler();
+  if (!scheduler) return;
+  const cps = scheduler.cps || 0.5;
+  seekToCycle((ms / 1000) * cps);
+}
+
+function skipCycles(n) {
+  const scheduler = getScheduler();
+  if (!scheduler || !playing) return;
+  const cur = scheduler.now();
+  seekToCycle(cur + n);
+  // Also adjust the elapsed timer to keep the progress bar in sync
+  const cps = scheduler.cps || 0.5;
+  const deltaMs = (n / cps) * 1000;
+  playStartTime -= deltaMs;
+}
+
+ffBtn.addEventListener('click', () => skipCycles(SKIP_CYCLES));
+rwBtn.addEventListener('click', () => skipCycles(-SKIP_CYCLES));
 
 // ── About button ──
 document.getElementById('about-btn').addEventListener('click', () => {
