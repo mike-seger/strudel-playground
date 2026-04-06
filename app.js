@@ -117,12 +117,14 @@ function deriveName(code, path) {
     const titleMatch = lines[i].match(/@title\s+(.+)/);
     if (titleMatch) return titleMatch[1].trim();
   }
-  // Try first line: // "Song Name" or // Song Name
+  // Try first line: // "Song Name" or // Song Name (skip if it contains a URL)
   const firstLine = lines[0];
-  const quoted = firstLine.match(/^\/\/\s*"(.+?)"/);
-  if (quoted) return quoted[1];
-  const plain = firstLine.match(/^\/\/\s*(.+)/);
-  if (plain) return plain[1].trim();
+  if (!/https?:\/\//.test(firstLine)) {
+    const quoted = firstLine.match(/^\/\/\s*"(.+?)"/);
+    if (quoted) return quoted[1];
+    const plain = firstLine.match(/^\/\/\s*(.+)/);
+    if (plain) return plain[1].trim();
+  }
   // Fallback: filename without extension
   return path.replace(/^.*\//, '').replace(/\.js$/, '');
 }
