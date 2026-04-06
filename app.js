@@ -48,12 +48,13 @@ window.fetch = async function (...args) {
 const songList = document.getElementById('song-list');
 const playBtn = document.getElementById('play-btn');
 const applyBtn = document.getElementById('apply-btn');
-const ffBtn = document.getElementById('ff-btn');
-const rwBtn = document.getElementById('rw-btn');
+const resetBtn = document.getElementById('reset-btn');
 const playIcon = document.getElementById('play-icon');
 const statusEl = document.getElementById('status');
 
 let playing = false;
+let paused = false;
+let pausedElapsed = 0;
 let activeLi = null;
 let songs = []; // populated after fetching
 let currentSongIndex = -1;
@@ -325,7 +326,7 @@ function selectSong(index, li) {
   // Skip if already on this song
   if (currentSongIndex === index) return;
   const wasPlaying = playing;
-  if (wasPlaying) stop();
+  if (wasPlaying) fullStop();
   if (activeLi) activeLi.classList.remove('active');
   li.classList.add('active');
   activeLi = li;
@@ -387,10 +388,14 @@ progressSlider.addEventListener('change', () => {
   seekToCycleFromMs(seekMs);
 });
 
-function startProgressLoop() {
-  playStartTime = Date.now();
-  seekOffset = 0;
-  progressSlider.value = 0;
+function startProgressLoop(resume) {
+  if (resume && pausedElapsed > 0) {
+    playStartTime = Date.now() - pausedElapsed;
+  } else {
+    playStartTime = Date.now();
+    seekOffset = 0;
+    progressSlider.value = 0;
+  }
   const maxMs = 10 * 60 * 1000;
   const tick = () => {
     if (!playing) {
@@ -406,17 +411,41 @@ function startProgressLoop() {
   progressRAF = requestAnimationFrame(tick);
 }
 
+function pauseProgressLoop() {
+  pausedElapsed = Date.now() - playStartTime;
+  if (progressRAF) cancelAnimationFrame(progressRAF);
+  progressRAF = null;
+}
+
 function stopProgressLoop() {
   if (progressRAF) cancelAnimationFrame(progressRAF);
   progressRAF = null;
   progressSlider.value = 0;
   elapsedEl.textContent = '0:00';
+  pausedElapsed = 0;
 }
 
 // ── Playback controls ──
 function play() {
   const code = getEditorCode();
   const replEl = document.getElementById('repl');
+
+  if (paused) {
+    // Resume from paused position
+    const scheduler = getScheduler();
+    if (scheduler) {
+      scheduler.clock.start();
+      scheduler.setStarted(true);
+    }
+    paused = false;
+    playing = true;
+    playBtn.classList.add('playing');
+    playIcon.innerHTML = '&#9646;&#9646;';
+    statusEl.textContent = 'Playing';
+    startProgressLoop(true);
+    return;
+  }
+
   if (!replEl) createRepl(code);
   else replEl.setAttribute('code', code);
 
@@ -431,34 +460,55 @@ function play() {
   };
   setTimeout(tryEval, 100);
   playing = true;
+  paused = false;
   playBtn.classList.add('playing');
   playIcon.innerHTML = '&#9646;&#9646;';
   statusEl.textContent = 'Playing';
   startProgressLoop();
 }
 
-function stop() {
+function pause() {
+  const scheduler = getScheduler();
+  if (scheduler) {
+    scheduler.clock.pause();
+    scheduler.setStarted(false);
+  }
+  pauseProgressLoop();
+  playing = false;
+  paused = true;
+  playBtn.classList.remove('playing');
+  playIcon.innerHTML = '&#9654;';
+  statusEl.textContent = 'Paused';
+}
+
+function fullStop() {
   stopProgressLoop();
+  paused = false;
   destroyRepl();
   playing = false;
   playBtn.classList.remove('playing');
   playIcon.innerHTML = '&#9654;';
   statusEl.textContent = 'Stopped';
-  // Recreate with current code so pattern display is ready
   if (currentSongIndex >= 0) {
     createRepl(getEditorCode());
   }
 }
 
 playBtn.addEventListener('click', () => {
-  if (playing) stop(); else play();
+  if (playing) pause(); else play();
+});
+
+resetBtn.addEventListener('click', () => {
+  const wasPlaying = playing;
+  fullStop();
+  if (wasPlaying) {
+    setTimeout(() => play(), 200);
+  }
 });
 
 applyBtn.addEventListener('click', applyCode);
 
 // ── Fast-forward / Rewind ──
-const SKIP_CYCLES = 4;
-
 function getScheduler() {
   const el = document.getElementById('repl');
   return el?.editor?.repl?.scheduler;
@@ -486,20 +536,6 @@ function seekToCycleFromMs(ms) {
   const cps = scheduler.cps || 0.5;
   seekToCycle((ms / 1000) * cps);
 }
-
-function skipCycles(n) {
-  const scheduler = getScheduler();
-  if (!scheduler || !playing) return;
-  const cur = scheduler.now();
-  seekToCycle(cur + n);
-  // Also adjust the elapsed timer to keep the progress bar in sync
-  const cps = scheduler.cps || 0.5;
-  const deltaMs = (n / cps) * 1000;
-  playStartTime -= deltaMs;
-}
-
-ffBtn.addEventListener('click', () => skipCycles(SKIP_CYCLES));
-rwBtn.addEventListener('click', () => skipCycles(-SKIP_CYCLES));
 
 // ── About button ──
 document.getElementById('about-btn').addEventListener('click', () => {

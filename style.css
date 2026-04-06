@@ -244,13 +244,10 @@ body > canvas {
   color: var(--accent-hover);
 }
 
-.transport-btn {
-  font-size: 12px !important;
-  opacity: 0.7;
-  transition: opacity 0.15s, color 0.15s;
-}
-.transport-btn:hover {
-  opacity: 1;
+#reset-btn {
+  font-size: 14px;
+  letter-spacing: -3px;
+  padding-right: 11px !important;
 }
 
 #play-btn.playing {
@@ -269,43 +266,43 @@ body > canvas {
 
 #progress {
   flex: 1;
-  height: 4px;
+  min-width: 60px;
   -webkit-appearance: none;
   appearance: none;
-  background: transparent;
   cursor: pointer;
+  height: 12px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: transparent;
 }
 
 #progress::-webkit-slider-runnable-track {
-  height: 4px;
   background: var(--border);
-  border-radius: 2px;
 }
 
 #progress::-webkit-slider-thumb {
   -webkit-appearance: none;
-  appearance: none;
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: var(--accent);
-  margin-top: -4px;
+  background: #ffffff;
   border: none;
+  box-shadow: -100vw 100px 4px 100vw var(--accent);
 }
 
 #progress::-moz-range-track {
-  height: 4px;
   background: var(--border);
-  border-radius: 2px;
-  border: none;
+  height: 100%;
 }
 
 #progress::-moz-range-thumb {
+  -moz-appearance: none;
   width: 12px;
   height: 12px;
   border-radius: 50%;
   background: var(--accent);
   border: none;
+  box-shadow: -100vw 100px 4px 100vw var(--accent);
 }
 
 #elapsed {
