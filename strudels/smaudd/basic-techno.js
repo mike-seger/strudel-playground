@@ -27,7 +27,7 @@ const bptrn = arrange(
   [1, "-6"]
 ).rib(0, 1)
 
-const bass = n("<[0 x 0/2 x [2/2 <x>]]>!2")
+const bass = n("<[0 ~ 0/2 ~ [2/2 ~]]>!2")
   .scale("E1:pelog,E2:pelog")
   .s("sine:20,pulse:1200")
   .dec("0.05 0.125")
@@ -77,7 +77,7 @@ const birds = n(irand("8 16").rib(0,"1")).struct("x x x x x".fast("2")).scale(
 
 const perc = n("<2 0 [3 2]>")
  .struct("<x x x>".fast(2))
- .s("<mridangam_nam casiorz1_lt mridangam_nam>")
+ .s("<nam casiorz1_lt nam>")
  .coarse(16)
  // .degradeBy("0.5 0")
  .phaser("<2 8 2>")
