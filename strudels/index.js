@@ -10,7 +10,6 @@ export const songs = [
   { path: "./comp-phys-marc/lofi_loop.js" },
   { path: "./comp-phys-marc/piano_loop.js" },
   { path: "./darkmarthur/13 - dubtechno.js" },
-  { path: "./darkmarthur/14 - shepard tone.js" },
   { path: "./darkmarthur/2 - acidil.js" },
   { path: "./darkmarthur/8 - trance & bass.js" },
   { path: "./dotcomdudee/strangerthings_drumandbass.js" },

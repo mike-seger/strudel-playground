@@ -17,7 +17,7 @@ const P = "pink";
 
 /////////// STRUDEL CODE ///////////
 const PORT = 'IAC Driver Bus 1';
-midiport(PORT);
+// midiport(PORT); // requires @strudel/midi
 
 setcpm(124 / 4);
 
@@ -94,10 +94,11 @@ const MODE = ':Aeolian'; // d natural min
 /////////////////////////////////////////////////////////////////////////////////////
 
 const RELEASE_FX = 0
-fx_release: ccn(73).ccv(RELEASE_FX).midi(PORT, { isController: true, midichannel: 1 });
-fx_fade: ccn(70).ccv(slider(0, 0, 0.5, 0.1)).midi(PORT, { isController: true, midichannel: 1 });
-fx_stutter: ccn(71).ccv(slider(0.3, 0, 0.5, 0.1)).midi(PORT, { isController: true, midichannel: 1 });
-fx_riser: ccn(72).ccv(slider(0.3, 0, 0.5, 0.1)).midi(PORT, { isController: true, midichannel: 1 });
+// MIDI CC output requires @strudel/midi (not installed)
+// fx_release: ccn(73).ccv(RELEASE_FX).midi(PORT, { isController: true, midichannel: 1 });
+// fx_fade: ccn(70).ccv(slider(0, 0, 0.5, 0.1)).midi(PORT, { isController: true, midichannel: 1 });
+// fx_stutter: ccn(71).ccv(slider(0.3, 0, 0.5, 0.1)).midi(PORT, { isController: true, midichannel: 1 });
+// fx_riser: ccn(72).ccv(slider(0.3, 0, 0.5, 0.1)).midi(PORT, { isController: true, midichannel: 1 });
 
 
 _$shepard_riser: note(saw.slow(8).range(48,60).segment(48).echoWith(6, 1/6, (p,i)=>p.add(12*i)))
@@ -399,15 +400,15 @@ _$voxen2:
 // ¸,ø¤º°`°º¤ø,¸¸,ø¤º°`°º¤ø,¸ ✧ ✦ ✧ HYDRA  ✧ ✦ ✧ ¸,ø¤º°`°º¤ø,¸¸,ø¤º°`°º¤ø,¸
 
 
-await initHydra({detectAudio: false, feedStrudel: 1})
-let PTN_BEAT = "0 1 2 3 4 5 6 7 8"
-
-const SRC_STRUDEL = () => 
-  src(s0)
-  .kaleid(
-    H(PTN_BEAT)
-  )
-  .diff(osc(1,0.5,5))
+// await initHydra({detectAudio: false, feedStrudel: 1}) // requires Hydra (REPL-only)
+// let PTN_BEAT = "0 1 2 3 4 5 6 7 8"
+//
+// const SRC_STRUDEL = () => 
+//   src(s0)
+//   .kaleid(
+//     H(PTN_BEAT)
+//   )
+//   .diff(osc(1,0.5,5))
   // // .modulateScale(osc(2,-0.25,1))
   // // .saturate(2)
   // .rotate(0, 0.1)
@@ -428,29 +429,30 @@ const SRC_STRUDEL = () =>
   //             0.5)
 
 
-const HGRADIENT = () =>
-  gradient(1)
+// const HGRADIENT = () =>
+//   gradient(1)
     // .mask(noise(1, 1).thresh(0.3))
     // .add(gradient(0.5).mask(noise(1, 1).thresh(0.3)))
-    .diff(src(o0).modulateScrollX(osc(1, 0.1)).scale(0.7))
-    .modulateScale(noise(() => time / .01, 0.1))
-    .color(H(PTN_BEAT))
+//     .diff(src(o0).modulateScrollX(osc(1, 0.1)).scale(0.7))
+//     .modulateScale(noise(() => time / .01, 0.1))
+//     .color(H(PTN_BEAT))
  
 
-const HOSC = () =>
-  osc(255,H(PTN_BEAT), H(PTN_BEAT))
-    .scrollX(H(time.sine), 0.77)
-    .scrollX(H(PTN_BEAT), 0.77)
-    .rotate(1, H(PTN_BEAT))
-    .scrollY(0, 0.01)
-    .colorama(20)
+// const HOSC = () =>
+//   osc(255,H(PTN_BEAT), H(PTN_BEAT))
+//     .scrollX(H(time.sine), 0.77)
+//     .scrollX(H(PTN_BEAT), 0.77)
+//     .rotate(1, H(PTN_BEAT))
+//     .scrollY(0, 0.01)
+//     .colorama(20)
 
 
-solid(0, 0, 0)
-  .layer(HGRADIENT(), 1)
-  .mult(HOSC(), 1)
-  .mult(SRC_STRUDEL(), 1)
-  .out(o0)
+// Hydra visuals (REPL-only, not available in this setup)
+// solid(0, 0, 0)
+//   .layer(HGRADIENT(), 1)
+//   .mult(HOSC(), 1)
+//   .mult(SRC_STRUDEL(), 1)
+//   .out(o0)
 
 
 
