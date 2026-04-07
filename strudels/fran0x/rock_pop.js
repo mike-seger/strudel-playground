@@ -15,7 +15,7 @@ let bass = note("<[36 48]*4 [34 46]*4 [41 53]*4 [39 51]*4>")
   .sound("gm_acoustic_bass")
   .lpf("200 1000 200 1000")
   .room(.2).size(.7)
-  .pan(-0.2)
+  .pan(.4)
   .gain(1.2)
 
 // GUITAR 1 – HIGH SPACEY HOOK / PAD
@@ -52,7 +52,7 @@ let guitar3 = note("<[48 55]*2 [46 53]*2 [48 56]*2 [46 50 58 62]*2>")
   .hpf(200)                        
   .room(.15).size(.4)              
   .attack(.005)                    
-  .pan(-.1)
+  .pan(.45)
 
 let the_drums = stack(drums, rim)
 let the_bass = stack(the_drums, bass)

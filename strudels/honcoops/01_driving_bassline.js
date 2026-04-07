@@ -156,7 +156,7 @@ stack(
   s("~ cp ~ cp").gain(0.5).room(0.4),
 
   // Subtle shaker for energy
-  s("shaker*16").gain(0.15)
+  s("sh*16").gain(0.15)
 )
 
 

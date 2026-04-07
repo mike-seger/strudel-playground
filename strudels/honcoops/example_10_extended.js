@@ -71,7 +71,7 @@ stack(
     .room(0.3),
 
   // OPTIMIZED: Combined shaker and ride into one percussion layer
-  s("~ ~ shaker ~ [~ ~ ~ ~] [~ ~ ~ ~] [~ ~ ~ ~] [~ ~ ride ~]".slow(2))
+  s("~ ~ sh ~ [~ ~ ~ ~] [~ ~ ~ ~] [~ ~ ~ ~] [~ ~ rd ~]".slow(2))
     .gain("<0 0 0 0.3>".slow(8))
     .hpf(6000),
 
@@ -203,7 +203,7 @@ stack(
     .room(0.6),
 
   // Crash cymbals - transitions
-  s("~!31 crash")
+  s("~!31 cr")
     .gain(0.7)
     .room(0.7)
     .delay(0.3),

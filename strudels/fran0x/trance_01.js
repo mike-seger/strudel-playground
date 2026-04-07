@@ -1,4 +1,4 @@
-$: n("<40 4 0 9 7>*16").add("<7 _ _ 6 5 _ _ 6>*2")
+$: n("<4 0 4 9 7>*16".add("<7 _ _ 6 5 _ _ 6>*2"))
   .scale("g:major").trans(-12)
   .octave(3).s("sawtooth")
   .delay(.4).pan(rand)

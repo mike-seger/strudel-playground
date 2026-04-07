@@ -44,7 +44,7 @@ stack(
     .room(0.4),
 
   // Percussion fills - adds interest
-  s("[~ ~ ~ ~] [~ ~ ~ ~] [~ ~ ~ ~] [~ ~ shaker*4]".slow(4))
+  s("[~ ~ ~ ~] [~ ~ ~ ~] [~ ~ ~ ~] [~ ~ sh*4]".slow(4))
     .gain(0.4),
 
   // ============================================
@@ -153,7 +153,6 @@ stack(
 
   // Doubled plucks - thickness in climax
   note("d5 ~ f5 ~ a5 ~ f5 ~ d5 ~ e5 ~ f5 ~ e5 ~")
-    .add(0.05) // Slightly detuned
     .sound("triangle")
     .lpf(4000)
     .hpf(800)
@@ -225,7 +224,7 @@ stack(
     .room(0.6),
 
   // Crash cymbal - section transitions
-  s("~!63 crash")
+  s("~!63 cr")
     .gain(0.7)
     .room(0.8)
     .delay(0.3),

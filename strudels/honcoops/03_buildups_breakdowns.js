@@ -165,7 +165,7 @@ stack(
   note("a2*8").sound("sawtooth").lpf(600).gain(0.5),
 
   // Simulating reverse cymbal with rising noise
-  s("~ ~ ~ crash")     // Crash on last beat
+  s("~ ~ ~ cr")     // Crash on last beat
     .gain(0.7)
     .room(0.8),
 
