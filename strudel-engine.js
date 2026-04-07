@@ -3,7 +3,7 @@
 // Replicates what @strudel/web's initStrudel() does, using individual packages
 // so Vite can properly deduplicate shared modules.
 
-import { Pattern, evalScope, setTime } from '@strudel/core';
+import { Pattern, evalScope, setTime, pure } from '@strudel/core';
 import {
   initAudioOnFirstClick,
   registerSynthSounds,
@@ -77,15 +77,20 @@ function installPolyfills() {
   if (!P._pianoroll) P._pianoroll = P.pianoroll || function () { return this; };
   if (!P._punchcard) P._punchcard = function () { return this; };
   if (!P._spectrum) P._spectrum = function () { return this; };
+  if (!P._spiral) P._spiral = function () { return this; };
+  if (!P._pitchwheel) P._pitchwheel = function () { return this; };
   if (!P.piano) P.piano = function () { return this; };
   if (!P.scope) P.scope = function () { return this; };
   if (!P.pianoroll) P.pianoroll = function () { return this; };
   if (!P.punchcard) P.punchcard = function () { return this; };
   if (!window.slider) {
-    window.slider = (defaultVal) => defaultVal;
+    window.slider = (defaultVal) => pure(defaultVal);
   }
   if (!window.sliderWithID) {
-    window.sliderWithID = (_id, defaultVal) => defaultVal;
+    window.sliderWithID = (_id, defaultVal) => pure(defaultVal);
+  }
+  if (!window.setGainCurve) {
+    window.setGainCurve = () => {};
   }
 }
 
@@ -145,8 +150,8 @@ export async function init() {
       {
         hush: () => repl.stop(),
         evaluate: (code) => repl.evaluate(code, true),
-        slider: (defaultVal) => defaultVal,
-        sliderWithID: (_id, defaultVal) => defaultVal,
+        slider: (defaultVal) => pure(defaultVal),
+        sliderWithID: (_id, defaultVal) => pure(defaultVal),
       },
     );
     await Promise.all([loadModules, registerSynthSounds()]);
