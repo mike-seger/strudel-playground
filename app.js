@@ -6,54 +6,7 @@ import { oneDark } from '@codemirror/theme-one-dark';
 import { defaultKeymap, indentWithTab } from '@codemirror/commands';
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
 import { closeBrackets } from '@codemirror/autocomplete';
-
-// ── Capture the AudioContext created by Strudel ──
-let strudelAudioCtx = null;
-const OrigAudioContext = window.AudioContext;
-window.AudioContext = function(...args) {
-  const ctx = new OrigAudioContext(...args);
-  strudelAudioCtx = ctx;
-  return ctx;
-};
-window.AudioContext.prototype = OrigAudioContext.prototype;
-
-// ── Patch fetch to fix broken JSON (trailing/missing commas) ──
-const _fetch = window.fetch;
-window.fetch = async function (...args) {
-  const resp = await _fetch.apply(this, args);
-  const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || '';
-  if (url.endsWith('.json') || /\.json\?/.test(url)) {
-    const clone = resp.clone();
-    resp.json = async () => {
-      let text = await clone.text();
-      try {
-        return JSON.parse(text);
-      } catch {
-        // Step 1: strip trailing commas before ] or }
-        text = text.replace(/,(\s*[\]}])/g, '$1');
-        // Step 2: iteratively insert missing commas
-        for (let i = 0; i < 50; i++) {
-          try {
-            return JSON.parse(text);
-          } catch (e) {
-            const m = e.message.match(/position (\d+)/);
-            if (!m) throw e;
-            const p = parseInt(m[1]);
-            let j = p - 1;
-            while (j >= 0 && /\s/.test(text[j])) j--;
-            const last = text[j], next = text[p];
-            if ((last === ']' || last === '"') && (next === '"' || next === '[')) {
-              text = text.substring(0, j + 1) + ',' + text.substring(j + 1);
-            } else {
-              throw e;
-            }
-          }
-        }
-      }
-    };
-  }
-  return resp;
-};
+import * as engine from './strudel-engine.js';
 
 const songList = document.getElementById('song-list');
 const playBtn = document.getElementById('play-btn');
@@ -79,11 +32,11 @@ if (resetRequested) {
   window.history.replaceState({}, '', url);
 }
 
-// ── Manage strudel-editor lifecycle ──
+// ── Visualization canvas management ──
+// @strudel/web auto-creates canvases on <body> for .pianoroll() / .scope().
+// Catch them and move into #pattern-display.
 const patternDisplay = document.getElementById('pattern-display');
 
-// Hydra (and similar) append a full-screen canvas to <body>.
-// Catch those and move them into #pattern-display.
 const bodyObserver = new MutationObserver((mutations) => {
   for (const m of mutations) {
     for (const node of m.addedNodes) {
@@ -96,45 +49,8 @@ const bodyObserver = new MutationObserver((mutations) => {
 });
 bodyObserver.observe(document.body, { childList: true });
 
-function destroyRepl() {
-  const old = document.getElementById('repl');
-  if (old) {
-    const editor = old.editor;
-    if (editor) {
-      try {
-        const scheduler = editor.repl?.scheduler;
-        if (scheduler) {
-          scheduler.stop?.();
-          scheduler.setStarted?.(false);
-        }
-      } catch {}
-      try { editor.stop(); } catch {}
-    }
-  }
-  // Kill residual audio (e.g. white-noise buffers left running)
-  if (strudelAudioCtx && strudelAudioCtx.state === 'running') {
-    strudelAudioCtx.suspend();
-  }
-  patternDisplay.innerHTML = '';
-}
-
-function createRepl(code) {
-  destroyRepl();
-  // Use innerHTML with HTML comment syntax — this is how strudel-editor reads code
-  const escaped = code.replace(/-->/g, '-- >');
-  patternDisplay.innerHTML = `<strudel-editor id="repl"><!--\n${escaped}\n--></strudel-editor>`;
-  const el = document.getElementById('repl');
-  // Also call setCode once the editor instance is ready
-  const trySetCode = () => {
-    if (el.editor) {
-      el.editor.setCode(code);
-    } else {
-      setTimeout(trySetCode, 150);
-    }
-  };
-  setTimeout(trySetCode, 100);
-  return el;
-}
+// Initialize strudel engine eagerly (loads samples in background)
+engine.init();
 
 // ── Derive a display name from file content or filename ──
 function deriveName(code, path) {
@@ -327,7 +243,7 @@ function handleSidebarNav(e) {
     e.preventDefault();
     e.stopPropagation();
     const deltaMs = e.key === 'ArrowRight' ? 10000 : -10000;
-    seekToCycleFromMs(Math.max(0, (Date.now() - playStartTime) + deltaMs));
+    engine.seekToCycleFromMs(Math.max(0, (Date.now() - playStartTime) + deltaMs));
     playStartTime -= deltaMs;
     return;
   }
@@ -400,23 +316,16 @@ function selectSong(index, li) {
   currentSongIndex = index;
   localStorage.setItem(SONG_KEY, index);
   setEditorCode(songs[index].code);
-  // Pre-load code into a fresh repl
-  createRepl(songs[index].code);
   if (wasPlaying) {
     setTimeout(() => play(), 200);
   }
 }
 
-// ── Apply: push editor code into the strudel repl ──
+// ── Apply: push editor code into the strudel engine ──
 function applyCode() {
   const code = getEditorCode();
-  // Recreate the repl with new code to ensure clean state
-  const replEl = createRepl(code);
   if (playing) {
-    setTimeout(() => {
-      const ed = replEl.editor;
-      if (ed) ed.evaluate();
-    }, 200);
+    engine.evaluateCode(code);
   }
 }
 
@@ -456,7 +365,7 @@ progressSlider.addEventListener('change', () => {
   seekOffset = seekMs;
   isSeeking = false;
   // Seek the cyclist to the matching cycle position
-  seekToCycleFromMs(seekMs);
+  engine.seekToCycleFromMs(seekMs);
 });
 
 function startProgressLoop(resume) {
@@ -499,17 +408,11 @@ function stopProgressLoop() {
 // ── Playback controls ──
 function play() {
   const code = getEditorCode();
-  const replEl = document.getElementById('repl');
 
   if (paused) {
-    // Resume from paused position (slider may have been moved while paused)
-    const scheduler = getScheduler();
-    if (scheduler) {
-      if (strudelAudioCtx) strudelAudioCtx.resume();
-      scheduler.clock.start();
-      scheduler.setStarted(true);
-      seekToCycleFromMs(pausedElapsed);
-    }
+    // Resume from paused position
+    engine.resume();
+    engine.seekToCycleFromMs(pausedElapsed);
     paused = false;
     playing = true;
     playBtn.classList.add('playing');
@@ -519,24 +422,14 @@ function play() {
     return;
   }
 
-  if (!replEl) createRepl(code);
-  else replEl.setAttribute('code', code);
-
-  // Resume audio context in case it was suspended during cleanup
-  if (strudelAudioCtx && strudelAudioCtx.state === 'suspended') {
-    strudelAudioCtx.resume();
-  }
-
-  const tryEval = () => {
-    const el = document.getElementById('repl');
-    const editor = el?.editor;
-    if (editor) {
-      editor.evaluate();
-    } else {
-      setTimeout(tryEval, 200);
-    }
-  };
-  setTimeout(tryEval, 100);
+  // Fresh start — evaluate the code
+  console.log('[app] play: calling evaluateCode');
+  engine.evaluateCode(code).then(() => {
+    console.log('[app] evaluateCode resolved OK');
+  }).catch(e => {
+    console.error('[play] evaluate failed:', e);
+    statusEl.textContent = 'Error';
+  });
   playing = true;
   paused = false;
   playBtn.classList.add('playing');
@@ -546,12 +439,7 @@ function play() {
 }
 
 function pause() {
-  const scheduler = getScheduler();
-  if (scheduler) {
-    scheduler.clock.pause();
-    scheduler.setStarted(false);
-  }
-  if (strudelAudioCtx) strudelAudioCtx.suspend();
+  engine.pause();
   pauseProgressLoop();
   playing = false;
   paused = true;
@@ -563,14 +451,11 @@ function pause() {
 function fullStop() {
   stopProgressLoop();
   paused = false;
-  destroyRepl();
+  engine.stop();
   playing = false;
   playBtn.classList.remove('playing');
   playIcon.innerHTML = '&#9654;';
   statusEl.textContent = 'Stopped';
-  if (currentSongIndex >= 0) {
-    createRepl(getEditorCode());
-  }
 }
 
 playBtn.addEventListener('click', () => {
@@ -586,35 +471,6 @@ resetBtn.addEventListener('click', () => {
 });
 
 applyBtn.addEventListener('click', applyCode);
-
-// ── Fast-forward / Rewind ──
-function getScheduler() {
-  const el = document.getElementById('repl');
-  return el?.editor?.repl?.scheduler;
-}
-
-function seekToCycle(target) {
-  const scheduler = getScheduler();
-  if (!scheduler) return;
-  target = Math.max(0, target);
-  if (typeof scheduler.setCycle === 'function') {
-    scheduler.setCycle(target);
-  } else {
-    scheduler.clock.stop();
-    scheduler.lastEnd = target;
-    scheduler.lastBegin = target;
-    scheduler.num_ticks_since_cps_change = 0;
-    scheduler.num_cycles_at_cps_change = target;
-    scheduler.clock.start();
-  }
-}
-
-function seekToCycleFromMs(ms) {
-  const scheduler = getScheduler();
-  if (!scheduler) return;
-  const cps = scheduler.cps || 0.5;
-  seekToCycle((ms / 1000) * cps);
-}
 
 // ── About button ──
 document.getElementById('about-btn').addEventListener('click', () => {
