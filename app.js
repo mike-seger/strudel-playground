@@ -7,6 +7,16 @@ import { defaultKeymap, indentWithTab } from '@codemirror/commands';
 import { syntaxHighlighting, defaultHighlightStyle, bracketMatching } from '@codemirror/language';
 import { closeBrackets } from '@codemirror/autocomplete';
 
+// ── Capture the AudioContext created by Strudel ──
+let strudelAudioCtx = null;
+const OrigAudioContext = window.AudioContext;
+window.AudioContext = function(...args) {
+  const ctx = new OrigAudioContext(...args);
+  strudelAudioCtx = ctx;
+  return ctx;
+};
+window.AudioContext.prototype = OrigAudioContext.prototype;
+
 // ── Patch fetch to fix broken JSON (trailing/missing commas) ──
 const _fetch = window.fetch;
 window.fetch = async function (...args) {
@@ -90,6 +100,11 @@ function destroyRepl() {
   const old = document.getElementById('repl');
   if (old) {
     try { old.editor?.stop(); } catch {}
+  }
+  // Close the AudioContext to kill all lingering nodes (noise, reverb tails, etc.)
+  if (strudelAudioCtx) {
+    strudelAudioCtx.close().catch(() => {});
+    strudelAudioCtx = null;
   }
   patternDisplay.innerHTML = '';
 }
@@ -417,13 +432,17 @@ progressSlider.addEventListener('input', () => {
 });
 
 progressSlider.addEventListener('change', () => {
-  if (!playing) {
-    isSeeking = false;
-    return;
-  }
-  // Treat the slider as 0–1000 mapping to 0–10 minutes
   const maxMs = 10 * 60 * 1000;
   const seekMs = (parseInt(progressSlider.value) / 1000) * maxMs;
+  isSeeking = false;
+  if (!playing && paused) {
+    // Update the stored elapsed so resume starts from this position
+    pausedElapsed = seekMs;
+    elapsedEl.textContent = formatTime(seekMs);
+    return;
+  }
+  if (!playing) return;
+  // Treat the slider as 0–1000 mapping to 0–10 minutes
   playStartTime = Date.now() - seekMs;
   seekOffset = seekMs;
   isSeeking = false;
@@ -474,11 +493,13 @@ function play() {
   const replEl = document.getElementById('repl');
 
   if (paused) {
-    // Resume from paused position
+    // Resume from paused position (slider may have been moved while paused)
     const scheduler = getScheduler();
     if (scheduler) {
+      if (strudelAudioCtx) strudelAudioCtx.resume();
       scheduler.clock.start();
       scheduler.setStarted(true);
+      seekToCycleFromMs(pausedElapsed);
     }
     paused = false;
     playing = true;
@@ -516,6 +537,7 @@ function pause() {
     scheduler.clock.pause();
     scheduler.setStarted(false);
   }
+  if (strudelAudioCtx) strudelAudioCtx.suspend();
   pauseProgressLoop();
   playing = false;
   paused = true;
