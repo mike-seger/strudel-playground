@@ -1,4 +1,4 @@
-//1 of 2 
+// strangerthings drumandbass
 setcps(0.725);
 
 p1: n("0 2 4 6 7 6 4 2")

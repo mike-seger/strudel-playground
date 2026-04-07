@@ -297,6 +297,16 @@ const sidebar = document.getElementById('sidebar');
 let navDebounce = null;
 
 function handleSidebarNav(e) {
+  // Left/Right arrow: seek ±10s when playing and sidebar is focused
+  if ((e.key === 'ArrowLeft' || e.key === 'ArrowRight') && playing) {
+    if (!sidebar.contains(document.activeElement) && document.activeElement !== sidebar) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const deltaMs = e.key === 'ArrowRight' ? 10000 : -10000;
+    seekToCycleFromMs(Math.max(0, (Date.now() - playStartTime) + deltaMs));
+    playStartTime -= deltaMs;
+    return;
+  }
   if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
   // Only handle when sidebar or its children are focused
   if (!sidebar.contains(document.activeElement) && document.activeElement !== sidebar) return;
@@ -304,18 +314,51 @@ function handleSidebarNav(e) {
   e.stopPropagation();
   if (navDebounce) return;
   navDebounce = setTimeout(() => { navDebounce = null; }, 150);
-  const items = Array.from(songList.querySelectorAll('li:not(.folder-header)'));
+  const items = Array.from(songList.querySelectorAll('li'));
   if (items.length === 0) return;
-  const activeIdx = items.findIndex((li) => li.classList.contains('active'));
+  // Find current position: active song or highlighted folder header
+  let curIdx = items.findIndex((li) => li.classList.contains('active') || li.classList.contains('nav-highlight'));
   let nextIdx;
   if (e.key === 'ArrowDown') {
-    nextIdx = activeIdx < items.length - 1 ? activeIdx + 1 : 0;
+    nextIdx = curIdx < items.length - 1 ? curIdx + 1 : 0;
   } else {
-    nextIdx = activeIdx > 0 ? activeIdx - 1 : items.length - 1;
+    nextIdx = curIdx > 0 ? curIdx - 1 : items.length - 1;
   }
   const nextLi = items[nextIdx];
-  nextLi.scrollIntoView({ block: 'center', behavior: 'smooth' });
-  selectSong(parseInt(nextLi.dataset.index), nextLi);
+  // Remove any previous folder highlight
+  songList.querySelectorAll('.nav-highlight').forEach(el => el.classList.remove('nav-highlight'));
+
+  if (nextLi.classList.contains('folder-header')) {
+    // Expand the folder if collapsed, then skip to the next song item
+    const folder = nextLi.textContent.replace(/^[▸▾]\s*/, '');
+    if (!expandedFolders.has(folder)) {
+      expandedFolders.add(folder);
+      renderSongList(songFilter.value);
+    }
+    // Re-query after possible re-render, find the header again and advance past it
+    const refreshed = Array.from(songList.querySelectorAll('li'));
+    const headerIdx = refreshed.findIndex(li =>
+      li.classList.contains('folder-header') && li.textContent.replace(/^[▸▾]\s*/, '') === folder
+    );
+    const step = e.key === 'ArrowDown' ? 1 : -1;
+    let songIdx = headerIdx + step;
+    if (songIdx >= refreshed.length) songIdx = 0;
+    if (songIdx < 0) songIdx = refreshed.length - 1;
+    // Skip consecutive headers (edge case)
+    while (refreshed[songIdx]?.classList.contains('folder-header')) {
+      songIdx += step;
+      if (songIdx >= refreshed.length) songIdx = 0;
+      if (songIdx < 0) songIdx = refreshed.length - 1;
+    }
+    const songLi = refreshed[songIdx];
+    if (songLi) {
+      songLi.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      selectSong(parseInt(songLi.dataset.index), songLi);
+    }
+  } else {
+    nextLi.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    selectSong(parseInt(nextLi.dataset.index), nextLi);
+  }
 }
 
 document.addEventListener('keydown', handleSidebarNav, true);
