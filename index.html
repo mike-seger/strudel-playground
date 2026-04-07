@@ -27,17 +27,21 @@
       <h2>Songs</h2>
       <input id="song-filter" type="text" placeholder="Filter (regex)" />
       <ul id="song-list" tabindex="0"></ul>
-      <button id="about-btn" title="About this project">About</button>
+      <div id="sidebar-footer">
+        <div id="sidebar-left">
+          <button id="reset-btn" title="Back to start"><span id="reset-icon">&#10073;&#9664;</span></button>
+          <button id="play-btn" title="Play / Pause">
+            <span id="play-icon">&#9654;</span>
+          </button>
+        </div>
+        <button id="about-btn" title="About this project">About</button>
+      </div>
     </aside>
     <main id="main">
       <div id="pattern-display"></div>
       <div id="editor"></div>
       <div id="diff-view" style="display:none"></div>
       <div id="toolbar">
-        <button id="reset-btn" title="Back to start"><span id="reset-icon">&#10073;&#9664;</span></button>
-        <button id="play-btn" title="Play / Pause">
-          <span id="play-icon">&#9654;</span>
-        </button>
         <button id="apply-btn" title="Apply changes">Apply</button>
         <button id="diff-btn" title="Show diff">Diff</button>
         <button id="revert-btn" title="Revert to original">Revert</button>

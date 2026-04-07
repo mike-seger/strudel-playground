@@ -153,16 +153,50 @@ html, body {
   font-weight: 600;
 }
 
-#about-btn {
+#sidebar-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--border);
+  padding: 6px 10px;
+}
+
+#sidebar-left {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+#sidebar-footer button {
   border: none;
   background: transparent;
+  cursor: pointer;
+  padding: 6px 10px;
+  transition: color 0.15s;
+}
+
+#sidebar-footer #reset-btn,
+#sidebar-footer #play-btn {
+  color: var(--accent);
+  font-size: 16px;
+}
+
+#sidebar-footer #reset-btn:hover,
+#sidebar-footer #play-btn:hover {
+  color: var(--accent-hover);
+}
+
+#sidebar-footer #play-btn.playing {
+  color: #f38ba8;
+}
+
+#sidebar-footer #play-btn.playing:hover {
+  color: #f5a0b8;
+}
+
+#about-btn {
   color: var(--text-muted);
   font-size: 13px;
-  cursor: pointer;
-  padding: 12px 20px;
-  text-align: left;
-  border-top: 1px solid var(--border);
-  transition: color 0.15s;
 }
 
 #about-btn:hover {
@@ -241,22 +275,6 @@ body > canvas {
 
 #toolbar button:hover {
   color: var(--accent-hover);
-}
-
-#reset-btn {
-  font-size: 14px;
-  letter-spacing: 0px;
-  padding-right: 10px !important;
-}
-
-#play-btn.playing {
-  color: #f38ba8;
-  position: relative;
-  top: -2px;
-}
-
-#play-btn.playing:hover {
-  color: #f5a0b8;
 }
 
 #status {
