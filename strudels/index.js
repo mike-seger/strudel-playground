@@ -57,6 +57,8 @@ export const songs = [
   { path: "./sueszli/trance.js" },
   { path: "./various/acid-bass.js" },
   { path: "./various/dj-dave-array.js" },
+  { path: "./various/elvens-on-mars.js" },
+  { path: "./various/finance.js" },
   { path: "./various/lo-fi-beat.js" },
   { path: "./various/music-4-machines.js" },
   { path: "./various/new-order-blue-monday.js" },
