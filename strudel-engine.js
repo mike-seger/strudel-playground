@@ -136,11 +136,11 @@ export async function init() {
       return this;
     };
 
-    // Pre-create orbits 0-4 so duck() doesn't error on missing targets
+    // Pre-create orbits 0-9 so duck() doesn't error on missing targets
     try {
       const ctrl = getSuperdoughAudioController();
       if (ctrl?.getOrbit) {
-        for (let i = 0; i < 5; i++) ctrl.getOrbit(i);
+        for (let i = 0; i < 10; i++) ctrl.getOrbit(i);
       }
     } catch {}
 
