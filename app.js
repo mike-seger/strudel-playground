@@ -423,19 +423,23 @@ function play() {
   }
 
   // Fresh start — evaluate the code
+  if (!code.trim()) {
+    statusEl.textContent = 'No code';
+    return;
+  }
   console.log('[app] play: calling evaluateCode');
   engine.evaluateCode(code).then(() => {
     console.log('[app] evaluateCode resolved OK');
+    playing = true;
+    paused = false;
+    playBtn.classList.add('playing');
+    playIcon.innerHTML = '&#9646;&#9646;';
+    statusEl.textContent = 'Playing';
+    startProgressLoop();
   }).catch(e => {
     console.error('[play] evaluate failed:', e);
     statusEl.textContent = 'Error';
   });
-  playing = true;
-  paused = false;
-  playBtn.classList.add('playing');
-  playIcon.innerHTML = '&#9646;&#9646;';
-  statusEl.textContent = 'Playing';
-  startProgressLoop();
 }
 
 function pause() {

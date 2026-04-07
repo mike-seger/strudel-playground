@@ -63,6 +63,12 @@ const DOUGH =
   'https://raw.githubusercontent.com/felixroos/dough-samples/main';
 const UZU_DRUMKIT =
   'https://raw.githubusercontent.com/tidalcycles/uzu-drumkit/main';
+const ALIAS_URL =
+  'https://raw.githubusercontent.com/todepond/samples/main/tidal-drum-machines-alias.json';
+
+// Track which sample URLs failed so we can retry them
+let failedSampleURLs = [];
+let aliasLoaded = false;
 
 // ── Polyfills for @strudel/repl-only APIs ──
 function installPolyfills() {
@@ -71,12 +77,43 @@ function installPolyfills() {
   if (!P._pianoroll) P._pianoroll = P.pianoroll || function () { return this; };
   if (!P._punchcard) P._punchcard = function () { return this; };
   if (!P._spectrum) P._spectrum = function () { return this; };
+  if (!P.piano) P.piano = function () { return this; };
+  if (!P.scope) P.scope = function () { return this; };
+  if (!P.pianoroll) P.pianoroll = function () { return this; };
+  if (!P.punchcard) P.punchcard = function () { return this; };
   if (!window.slider) {
     window.slider = (defaultVal) => defaultVal;
   }
   if (!window.sliderWithID) {
     window.sliderWithID = (_id, defaultVal) => defaultVal;
   }
+}
+
+async function loadSamplePacks(urls) {
+  const results = await Promise.all(
+    urls.map(url => samples(url)
+      .then(() => ({ url, ok: true }))
+      .catch(e => { console.warn('[engine] sample load failed:', url.split('/').pop(), e.message); return { url, ok: false }; })
+    )
+  );
+  failedSampleURLs = results.filter(r => !r.ok).map(r => r.url);
+  if (failedSampleURLs.length === 0 && !aliasLoaded) {
+    try {
+      aliasBank(ALIAS_URL);
+      aliasLoaded = true;
+    } catch (e) {
+      console.warn('[engine] aliasBank failed:', e.message);
+    }
+  }
+  if (failedSampleURLs.length > 0) {
+    console.warn(`[engine] ${failedSampleURLs.length} sample pack(s) failed to load (offline?)`);
+  }
+}
+
+async function retryFailedSamples() {
+  if (failedSampleURLs.length === 0) return;
+  console.log(`[engine] retrying ${failedSampleURLs.length} failed sample pack(s)...`);
+  await loadSamplePacks([...failedSampleURLs]);
 }
 
 export async function init() {
@@ -115,20 +152,21 @@ export async function init() {
     await Promise.all([loadModules, registerSynthSounds()]);
     console.log('[engine] modules loaded, synth sounds registered');
 
-    // 2. Our extra prebake: soundfonts + sample packs
-    await Promise.all([
+    // 2. Our extra prebake: soundfonts + sample packs (non-fatal if offline)
+    const sampleURLs = [
+      `${DOUGH}/tidal-drum-machines.json`,
+      `${DOUGH}/piano.json`,
+      `${DOUGH}/Dirt-Samples.json`,
+      `${DOUGH}/vcsl.json`,
+      `${DOUGH}/mridangam.json`,
+      `${UZU_DRUMKIT}/strudel.json`,
+    ];
+    const misc = [
       registerSoundfonts(),
       registerZZFXSounds(),
-      samples(`${DOUGH}/tidal-drum-machines.json`),
-      samples(`${DOUGH}/piano.json`),
-      samples(`${DOUGH}/Dirt-Samples.json`),
-      samples(`${DOUGH}/vcsl.json`),
-      samples(`${DOUGH}/mridangam.json`),
-      samples(`${UZU_DRUMKIT}/strudel.json`),
-    ]);
-    aliasBank(
-      'https://raw.githubusercontent.com/todepond/samples/main/tidal-drum-machines-alias.json'
-    );
+    ].map(p => Promise.resolve(p).catch(e => console.warn('[engine] load failed:', e.message)));
+    await Promise.all(misc);
+    await loadSamplePacks(sampleURLs);
 
     // 3. Make .play() work on patterns
     Pattern.prototype.play = function () {
@@ -156,6 +194,7 @@ export async function init() {
 export async function evaluateCode(code) {
   console.log('[engine] evaluateCode called');
   await init();
+  await retryFailedSamples();
   const ac = getAudioContext?.();
   console.log('[engine] AudioContext state:', ac?.state);
   if (ac?.state === 'suspended') await ac.resume();
@@ -175,14 +214,16 @@ export function pause() {
   try { repl?.pause(); } catch {}
 }
 
-export function resume() {
+export async function resume() {
   try {
     // Reset clock phase to avoid "skip query: too late" spam.
     // clock.stop() resets phase to 0 without touching cyclist.lastEnd,
     // so the pattern continues from where it was paused.
     repl?.scheduler?.clock?.stop();
-    repl?.start();
-  } catch {}
+    await repl?.start();
+  } catch (e) {
+    console.warn('[engine] resume failed:', e.message);
+  }
 }
 
 export function getScheduler() {
