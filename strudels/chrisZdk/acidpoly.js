@@ -3,7 +3,7 @@
 setCpm (132/4)
 setGainCurve(x => Math.pow(x, 2))
 register('o', (orbit, pat) => pat.orbit(orbit))
-register('acidenv', (x, pat) => pat.lpf(200).lpenv(x * 12).lps(.4).lpd(.12))
+register('acidenv', (x, pat) => pat.lpf(200).lpenv(typeof x === 'number' ? x * 12 : x.mul(12)).lps(.4).lpd(.12))
 
 const KICK_ON = 1
 const HIT_ON = 1

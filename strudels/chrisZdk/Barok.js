@@ -8,7 +8,7 @@ setcps(170/60/4)
 
 $: s ("<bd sd [~ bd] sd>*4")
   .bank("rolandtr505")
-  .compressor(.85)
+  .compressor(-10)
   .color("yellow")._scope()
 
 // --- breaks ----
@@ -33,7 +33,7 @@ $: n(1) .s("break/2") .clip(0.2)
 $: n(1) .s("barok").clip("<0.2 0.5 0.1 0.4>/2") //drop
   .gain(slider(0.6, 0, 1, .1))
   .orbit(3)
-  .pan("0 3 .4 1")
+  .pan("0 .3 .4 1")
   .sometimes(x => x.chop(8).delay(.2))
   .sometimes(x => x.speed((0.2, 2))) 
   .lpf(perlin.range(100,1000).slow(8))

@@ -22,7 +22,7 @@ $:sound("[bd*4]")
   .lpf(("500 1000 750 1000").delay(".3"))
   .gain("1")
   .orbit(2)
-  .compressor(.85)
+  .compressor(-10)
   .color("yellow")
 
 $:n("1*0.2").s("vox")
@@ -47,7 +47,7 @@ $: s("triangle*6")
   .decay(0.2)
   .sometimes(x => x.delay(.3))
   .n(irand(6))
-  .scale('D minor')
+  .scale('D:minor')
   .room(0.5).roomsize(8).orbit(3)
   .lpf(sine.range(100, 1500).slow(16))
   .orbit(5)
@@ -55,7 +55,7 @@ $: s("triangle*6")
   .color("cyan")
 
  
-$: n("<d1 e1 f2 d1>*2").scale('D minor') .layer(
+$: n("<d1 e1 f2 d1>*2").scale('D:minor') .layer(
   x=>x
     .s("harmonica") 
     .vib(4)

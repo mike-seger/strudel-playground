@@ -6,7 +6,7 @@ samples('https://raw.githubusercontent.com/ChrisZDK/chaos/main/strudel.json?vers
 setcps(88/60/4)
 
 $: s("serenissima_drums/2").fit()
-  .compressor(.85)
+  .compressor(-10)
   .room(0.4).roomsize(1) 
   .orbit(2)
   .gain(slider(0.66,0,1))
