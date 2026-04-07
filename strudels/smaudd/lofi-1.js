@@ -22,7 +22,7 @@ const hh = n(`
 
 const pad = note(`
 <e2@2 c#2@2 b2@2 b2@2>
-`.fast(4)).s("<chords:16/2 chords:16>")
+`.fast(4)).s("supersaw")
  // .chop("2 0")
  .dec(1.5)
  // .cut(0)

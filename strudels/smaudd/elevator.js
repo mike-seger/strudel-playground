@@ -43,7 +43,7 @@ const bass2 = note("c2 g2 ~ c2 ~").s("sine,sine")
 
 // const g1 = s("bd bd bd 5").bank("RolandTR909")
 
-const bass = n(irand("~ 2").rib(0,2).sub("7").seg("8"))
+const bass = note(irand("~ 2").rib(0,2).sub("7").seg("8"))
   // .scale("c2")
   .s("sine,square")
   // .phaser(2)

@@ -45,7 +45,7 @@ const sq = s("sequential ~")
   ._scope()// "2 16 64 32 128@2" save this for later liked
 // "x x/2 x@2 x x x/2 x x*2 x@2 x/4 x x/7"
 
-const lead = n(irand("1 8 2,64 0 64").rib(0, "2 4"))
+const lead = n(irand("1 8 2,16 0 16").rib(0, "2 4"))
   .struct("x x x x".fast(1)).scale("E4:minor")
   .s('sine')
   // .fma
@@ -60,7 +60,7 @@ const lead = n(irand("1 8 2,64 0 64").rib(0, "2 4"))
   .room("0.1 0.01")
   .roomlp(1200)
   .vib("0.2")
-  .lpf("<880 1200 1000 @1500 2000>")
+  .lpf("<880 1200 1000 1500 2000>")
   .gain(0.3)
   ._punchcard()// x x x@2 x*4"
 
