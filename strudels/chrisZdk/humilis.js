@@ -70,7 +70,7 @@ $: notes
     .lpq(5)
     .distort("1.2:.5")
     .ftype('ladder')
-    .someCycles(x => x.pan ("<2 .2>"))
+    .someCycles(x => x.pan ("<.2 .2>"))
     .sometimes(x => x.delay("<.2 .1 .4>"))
     .room(1).roomsize(2) 
     //.o(7)
