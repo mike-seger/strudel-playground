@@ -99,12 +99,21 @@ bodyObserver.observe(document.body, { childList: true });
 function destroyRepl() {
   const old = document.getElementById('repl');
   if (old) {
-    try { old.editor?.stop(); } catch {}
+    const editor = old.editor;
+    if (editor) {
+      try {
+        const scheduler = editor.repl?.scheduler;
+        if (scheduler) {
+          scheduler.stop?.();
+          scheduler.setStarted?.(false);
+        }
+      } catch {}
+      try { editor.stop(); } catch {}
+    }
   }
-  // Close the AudioContext to kill all lingering nodes (noise, reverb tails, etc.)
-  if (strudelAudioCtx) {
-    strudelAudioCtx.close().catch(() => {});
-    strudelAudioCtx = null;
+  // Kill residual audio (e.g. white-noise buffers left running)
+  if (strudelAudioCtx && strudelAudioCtx.state === 'running') {
+    strudelAudioCtx.suspend();
   }
   patternDisplay.innerHTML = '';
 }
@@ -512,6 +521,11 @@ function play() {
 
   if (!replEl) createRepl(code);
   else replEl.setAttribute('code', code);
+
+  // Resume audio context in case it was suspended during cleanup
+  if (strudelAudioCtx && strudelAudioCtx.state === 'suspended') {
+    strudelAudioCtx.resume();
+  }
 
   const tryEval = () => {
     const el = document.getElementById('repl');
