@@ -61,7 +61,14 @@ html, body {
 
 #app {
   display: flex;
-  height: 100vh;
+  height: 100dvh;
+  height: 100vh; /* fallback for older browsers */
+}
+
+@supports (height: 100dvh) {
+  #app {
+    height: 100dvh;
+  }
 }
 
 /* ── Sidebar ── */
