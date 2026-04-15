@@ -339,7 +339,7 @@ function selectSong(index, li) {
   // Skip if already on this song
   if (currentSongIndex === index) return;
   const wasPlaying = playing;
-  if (wasPlaying) fullStop();
+  fullStop();
   if (activeLi) activeLi.classList.remove('active');
   li.classList.add('active');
   activeLi = li;
