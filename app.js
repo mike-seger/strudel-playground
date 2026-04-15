@@ -511,5 +511,26 @@ document.getElementById('about-btn').addEventListener('click', () => {
   window.open('doc/', '_blank');
 });
 
+// ── Mobile layout: move progress slider into sidebar ──
+function setupMobileLayout() {
+  const mq = window.matchMedia('(max-width: 768px)');
+  const sidebarLeft = document.getElementById('sidebar-left');
+  const toolbar = document.getElementById('toolbar');
+
+  function handleMobile(e) {
+    if (e.matches) {
+      sidebarLeft.appendChild(progressSlider);
+      sidebarLeft.appendChild(elapsedEl);
+    } else {
+      toolbar.appendChild(progressSlider);
+      toolbar.appendChild(elapsedEl);
+    }
+  }
+
+  mq.addEventListener('change', handleMobile);
+  handleMobile(mq);
+}
+setupMobileLayout();
+
 // ── Start ──
 loadSongs();

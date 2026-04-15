@@ -81,5 +81,6 @@ export const songs = [
   { path: "./various/techno-a.js" },
   { path: "./various/techno-b.js" },
   { path: "./various/techno-song.js" },
+  { path: "./various/todepons-dash-on-the-train.js" },
   { path: "./various/xcx-360-cover.js" },
 ];

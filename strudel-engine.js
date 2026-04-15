@@ -129,6 +129,8 @@ export async function init() {
   setLogger((...args) => {
     const msg = args[0];
     if (typeof msg === 'string' && msg.includes('Deprecation warning')) return;
+    if (typeof msg === 'string' && msg.includes("Can't do arithmetic on control pattern")) return;
+    if (typeof msg === 'string' && msg.includes('not found! Is it loaded')) return;
     console.log(...args);
   });
 
