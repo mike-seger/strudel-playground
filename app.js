@@ -377,6 +377,7 @@ function formatTime(ms) {
 // Seeking: when user drags or clicks, restart playback from that offset
 progressSlider.addEventListener('input', () => {
   isSeeking = true;
+  progressSlider.style.setProperty('--progress', (progressSlider.value / 10) + '%');
 });
 
 progressSlider.addEventListener('change', () => {
@@ -414,7 +415,9 @@ function startProgressLoop(resume) {
     if (!isSeeking) {
       const elapsed = Date.now() - playStartTime;
       elapsedEl.textContent = formatTime(elapsed);
-      progressSlider.value = Math.min(1000, Math.floor((elapsed / maxMs) * 1000));
+      const val = Math.min(1000, Math.floor((elapsed / maxMs) * 1000));
+      progressSlider.value = val;
+      progressSlider.style.setProperty('--progress', (val / 10) + '%');
     }
     progressRAF = requestAnimationFrame(tick);
   };
@@ -431,6 +434,7 @@ function stopProgressLoop() {
   if (progressRAF) cancelAnimationFrame(progressRAF);
   progressRAF = null;
   progressSlider.value = 0;
+  progressSlider.style.setProperty('--progress', '0%');
   elapsedEl.textContent = '0:00';
   pausedElapsed = 0;
 }

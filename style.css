@@ -385,8 +385,26 @@ body > canvas {
   #sidebar-left #progress {
     flex: 1;
     min-width: 0;
-    height: 10px;
-    border-radius: 5px;
+    height: 14px;
+    border-radius: 7px;
+    overflow: visible;
+    background: linear-gradient(to right, var(--accent) var(--progress, 0%), var(--border) var(--progress, 0%));
+  }
+
+  #sidebar-left #progress::-webkit-slider-runnable-track {
+    background: transparent;
+    height: 14px;
+    border-radius: 7px;
+  }
+
+  #sidebar-left #progress::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: none;
+    box-shadow: none;
   }
 
   #sidebar-left #elapsed {
