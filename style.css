@@ -292,13 +292,11 @@ body > canvas {
   height: 12px;
   border-radius: 6px;
   overflow: hidden;
-  background: var(--border);
+  background: transparent;
 }
 
 #progress::-webkit-slider-runnable-track {
-  background: transparent;
-  height: 12px;
-  border-radius: 6px;
+  background: var(--border);
 }
 
 #progress::-webkit-slider-thumb {
@@ -308,7 +306,7 @@ body > canvas {
   border-radius: 50%;
   background: #ffffff;
   border: none;
-  box-shadow: -100vw 0 0 100vw var(--accent);
+  box-shadow: -100vw 100px 4px 100vw var(--accent);
 }
 
 #progress::-moz-range-track {
@@ -323,7 +321,7 @@ body > canvas {
   border-radius: 50%;
   background: var(--accent);
   border: none;
-  box-shadow: -100vw 0 0 100vw var(--accent);
+  box-shadow: -100vw 100px 4px 100vw var(--accent);
 }
 
 #elapsed {
