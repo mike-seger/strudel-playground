@@ -32,6 +32,8 @@ html, body {
   background: var(--bg);
   color: var(--text);
   color-scheme: dark;
+  overscroll-behavior: none;
+  overflow: hidden;
 }
 
 /* ── Dark scrollbars ── */
