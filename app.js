@@ -137,15 +137,45 @@ function initUI() {
     .map((song, i) => ({ ...song, originalIndex: i }))
     .sort((a, b) => a.name.localeCompare(b.name));
 
+  // Restore last song, or default to first
+  let targetIndex = 0;
+  const savedRaw = localStorage.getItem(SONG_KEY);
+  if (savedRaw !== null) {
+    let saved;
+    try { saved = JSON.parse(savedRaw); } catch { saved = null; }
+    if (saved && typeof saved.name === 'string') {
+      // Find all songs matching the saved name
+      const matches = songs
+        .map((s, i) => ({ song: s, index: i }))
+        .filter(({ song }) => song.name === saved.name);
+      if (matches.length === 1) {
+        targetIndex = matches[0].index;
+      } else if (matches.length > 1) {
+        // Pick the one closest in global position to the previously saved index
+        const prevIdx = typeof saved.index === 'number' ? saved.index : 0;
+        matches.sort((a, b) => Math.abs(a.index - prevIdx) - Math.abs(b.index - prevIdx));
+        targetIndex = matches[0].index;
+      } else {
+        // Name not found — fall back to saved index if valid
+        const idx = typeof saved.index === 'number' ? saved.index : 0;
+        if (idx >= 0 && idx < songs.length) targetIndex = idx;
+      }
+    } else {
+      // Legacy format (plain number)
+      const idx = parseInt(savedRaw);
+      if (!isNaN(idx) && idx >= 0 && idx < songs.length) targetIndex = idx;
+    }
+  }
+
+  // Expand the folder containing the target song
+  const targetPath = songs[targetIndex].path.replace(/^\.\//, '');
+  const slash = targetPath.lastIndexOf('/');
+  if (slash !== -1) {
+    expandedFolders.add(targetPath.substring(0, slash));
+  }
+
   renderSongList('');
 
-  // Restore last song, or default to first
-  const savedIndex = localStorage.getItem(SONG_KEY);
-  let targetIndex = 0;
-  if (savedIndex !== null) {
-    const idx = parseInt(savedIndex);
-    if (idx >= 0 && idx < songs.length) targetIndex = idx;
-  }
   // Find the <li> matching the target original index
   const targetLi = Array.from(songList.querySelectorAll('li'))
     .find(li => parseInt(li.dataset.index) === targetIndex);
@@ -314,7 +344,7 @@ function selectSong(index, li) {
   li.classList.add('active');
   activeLi = li;
   currentSongIndex = index;
-  localStorage.setItem(SONG_KEY, index);
+  localStorage.setItem(SONG_KEY, JSON.stringify({ name: songs[index].name, index }));
   setEditorCode(songs[index].code);
   if (wasPlaying) {
     setTimeout(() => play(), 200);

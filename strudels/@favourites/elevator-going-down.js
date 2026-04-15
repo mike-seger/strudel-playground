@@ -14,7 +14,7 @@ const kick909 = s(kickp).s("rolandtr909_bd")
 const kick = s(kickp).s("house")
    .lpf(2200)
 
-const bassLong = note("c2 g2 g#3 g c c/2").s("sine,sine")
+const bassLong = note("c2 g2 g#3 g c c/2").s("z_sine,sine")
   // .attack(0.1)
   .dec(0.8)
   .detune(2)
@@ -27,66 +27,70 @@ const bassLong = note("c2 g2 g#3 g c c/2").s("sine,sine")
   // .size(10)
   .gain(1)
 
-const bass2 = note("c2 g2 ~ c2 ~").s("sine,sine")
+const bass2 = note("a1 e2 ~  ~ [g2 g1]").s("z_sine,sine")
   // .attack(0.1)
-  .dec(0.8)
+  .dec(0.45)
   .detune(2)
   .fm(sine.range(-1, 2))
   // .slide("-0.5 -0.45 -.3")
   .lpe(8)
-  .lpf(800)
-  .distort(0.5)
-  .room(0.3)
+  .lpf(1800)
+  .distort(0.8)
   // .size(10)
-  .gain(1)
   // .dec(0)
 
 // const g1 = s("bd bd bd 5").bank("RolandTR909")
 
-const bass = note(irand("~ 2").rib(0,2).sub("7").seg("8"))
-  // .scale("c2")
-  .s("sine,sine")
-  // .phaser(2)
+const lead = n(irand("~ 2 6").rib(0,8).sub("7").seg("8"))
+  .scale("A:minor")
+  .s("sine,square")
+  .phaser(2)
   .dec(0.25)
   .fm(sine.range(-8, 8))
-  // .lpe(berlin.range(4, 3))
-  .gain(1)
+  .lpe(berlin.range(4, 3))
   .distort(0.5)
-  // .lpf(1800)
+  .lpf(100)
   .delay(0.25)
   // .hpf(1200)
 
-const bk = s("breaks165:0").loopAt(4)
+const bk = s("breakardo:33/4,sine")
+  .fit()
+  .scrub("{0 1*2 2 3}%4".seg(4).div(16))
   .room(0.5)
   .dec(0.1)
   .delay(0.125)
 
-const bk2 = s("breaks165:0").loopAt(4)
+const bk2 = s("breakardo:30/4,sine")
+  .fit()
+  .scrub("{0 1*2 2 3}%4".seg(4).div(16))
   .room(0.25)
-  .dec(0.1)
+  .dec(0.05)
   // .delay(0.125)
 
 
-const bk3 = s("breaks165:0").loopAt(4)
+const bk3 = s("breakardo:6/4,sine")
+  .fit()
+  .scrub("{0 1*2 2 3}%4".seg(4).div(16))
   .room(0.5)
   .dec(0.1)
   .delay(0.125)
 
-const pad = chord("Cm9!3 Gm7!2 Cm!2 Gm7".slow(4))
+const pad = chord("Am9/2 Em9".slow(4)).arp("[1 1 1 1]!2")
   // .attack(0.3)
-  .dec(2)
+  .dec(0.1)
   .release("0.1")
-  .s("supersaw,sine")
-  .detune(sine.range(0, 1))
+  .s("z_sine")
+  // .slide(-0.5)
+  // .detune(sine.range(0, 1))
   // .pw(0.5)
   .lpf(sine.range(300, 1200))
   .lpe(sine.range(-2, 2))
   .fm(sine.range(-16,16))
   .voicing()
   .room(0.4)
-  .delay(0.5)
+  .delay(0.125)
 
-const notes = note("[c d# a# d]!2")
+const notes = note("[g a b e]!2")
   // .arp("0 [0,2] 1 [0,2]")
   // .attack(0.3)
   .s("supersaw,pulse")
@@ -106,15 +110,25 @@ const hh = n("[~ ~ 0 ~]!4")
   .s("dr110_hh")
   .delay(0.125)
 
+const hhfill = n("[~ ~ 0 0]!4")
+  .s("rd")
+  .speed(0)
+  .every(4, x => x.speed(1))
+  .every(8, x => x.speed(2))
+  .every(2, x => x.dec(1))
+  .phaser(1.5)
+  .jux(rev)
+  .gain(0.1)
+  .dec(0.4)
+  .delay(0.125)
+
 const poly = s("koy dr hc kurt")
-  .sometimes(x => x.add("metal"))
   // .fast(2)
   .distort(.8)
   // .sometimes(x => x.slow(5))
   .phaser(2)
-  .pan(sine.range(0, 1))
+  .pan(sine.range(-0.5, 1))
   .delay(0.125)
-  .gain(0.1)
 
 const sn = note("~ ~ ~ e")
   .s("sn:5/8")
@@ -129,37 +143,37 @@ const sn = note("~ ~ ~ e")
   // .phaser(2)
   .gain(0.8)
 
-const sprinkle = n("0!8".add(berlin.fast(8).mul(14)))
-  // .scale("c:ritusen")
+const sprinkle = n("0!8".add(berlin.fast(4).mul(14)))
+  .scale("A:minor")
   .s("supersaw")
   .phaser(2)
   .dec(0.1)
   .fm(sine.range(0, 128))
-  .slide("0.1 0 0 0")
+  // .slide("0.1 0 0 0")
   .lpe(32)
   .lpf(1500)
   .room(0.5)
   .delay(0.25)
-  .gain(0.2)
 
 $: stack(
   // kick909,
   kick.duckorbit(2).duckattack(0.2).duckdepth(0.6),
-  bass.gain(0.4).orbit(2),
-  bass2.gain(0.4).orbit(2),
-  // bk3.gain(0.5).orbit(2),
-  pad.gain(0.1).orbit(2),
-  // notes.gain(0.1),
-  // hh.distort(sine.range(0, 1)),
-  // poly,
+  // lead.gain(0.4).orbit(2),
+  bass2.gain(0.2).orbit(2),
+  hhfill.gain(0.5),
+  // bk3.gain(0.3).orbit(2),
+  pad.gain(0.2).orbit(2),
+  notes.gain(0.1),
+  hh.distort(sine.range(0, 1)),
+  // poly.gain(0.2),
   sn.orbit(2),
-  sprinkle.orbit(2),
+  // sprinkle.gain(0.3).orbit(2),
 ).hpf(slider(0, 0, 1200))
 
 $: stack(
-  bk.gain(0.5).pan(sine.range(0.5, 0.5)),
+  // bk.gain(0.2).pan(sine.range(0.5, 0.5)),
   // bk2.gain(0.4),
-  // bk3.gain(0.5),
+  // bk3.gain(0.1),
 ).orbit(2).hpf(2200)
 
   // .scope()
