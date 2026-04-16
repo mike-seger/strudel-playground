@@ -57,6 +57,22 @@ Options:
 
 If the auto-detected BPM exceeds 300 it is clamped automatically. Use `--bpm` to set an exact tempo.
 
+## kern_to_strudel.py
+
+Convert a [Humdrum Kern](https://kern.humdrum.org/) score (`.krn`) to Strudel mini-notation. Outputs two `$: note()` blocks (RH and LH) to stdout.
+
+```bash
+python3 scripts/kern_to_strudel.py path/to/score.krn > /tmp/output.txt
+```
+
+The script handles voice splits (`*^`/`*v`), grace note skipping, chord merging, half-measure combining, and rest filtering. It expects `*>` section markers with a norep expansion order.
+
+Example — convert a Kern file and capture the output:
+
+```bash
+python3 scripts/kern_to_strudel.py tmp/alla-turca.krn > tmp/alla-turca-strudel.txt
+```
+
 ## recreate-index.sh
 
 Regenerate `strudels/index.js` by scanning the `strudels/` directory for `.js` files.
