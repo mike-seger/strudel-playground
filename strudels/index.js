@@ -35,6 +35,7 @@ export const songs = [
   { path: "./eefano/waltzno2.js" },
   { path: "./eefano/whydoesmybrain.js" },
   { path: "./eefano/woodeneye.js" },
+  { path: "./experiments/classical-claude-opus-4.6/alla-turca.js" },
   { path: "./experiments/classical-claude-opus-4.6/fur-elise.js" },
   { path: "./experiments/classical-claude-opus-4.6/moonlight-sonata.js" },
   { path: "./experiments/classical-gemini-3.3/alla-turca.js" },
