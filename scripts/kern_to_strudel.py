@@ -7,8 +7,12 @@ ready to paste into a Strudel .js pattern file.
 Usage:
     python3 scripts/kern_to_strudel.py path/to/score.krn
 
-The Kern file must use *> section markers and the norep expansion order.
+Supports two modes:
+1. Section-marked files (*> labels + norep expansion) — e.g. Alla Turca
+2. Section-free files (barline-only measures) — e.g. Moonlight Sonata
+
 Voice splits (*^/*v), grace notes, and chords are handled automatically.
+Spine identity is tracked through splits and merges across measures.
 """
 import re
 import sys
@@ -29,7 +33,7 @@ def note_sort_key(note_str):
 def kern_to_strudel_pitch(token):
     """Convert a kern pitch token like 'cc#', 'BB-', 'eenLL' to strudel 'c#5', 'bb1', 'e5'."""
     s = token.strip()
-    s = re.sub(r'^[\(<>/]+', '', s)
+    s = re.sub(r'^[\(<>\[\]{}/_]+', '', s)
     s = re.sub(r'^\d+\.?', '', s)
     # Remove non-pitch modifiers
     s = re.sub(r'[LJq()\[\]\'\{\}><~tT:;\d\s\.\,X/]+', '', s)
@@ -54,7 +58,7 @@ def kern_to_strudel_pitch(token):
 def kern_dur_sixteenths(token):
     """Extract duration from kern token as sixteenth-note count."""
     s = token.strip()
-    s = re.sub(r'^[\(<>/]+', '', s)
+    s = re.sub(r'^[\(<>\[\]{}/_]+', '', s)
     m = re.match(r'(\d+)(\.?)', s)
     if not m:
         return None
@@ -141,11 +145,101 @@ def format_strudel_token(dur, notes):
     elif dur == int(dur):
         return f"{ns}@{int(dur)}"
     else:
-        return f"{ns}@{dur:g}"
+        # Round to avoid floating point noise (e.g. 1.3333333 → 1.33333)
+        return f"{ns}@{round(dur, 5):g}"
 
 
 def events_to_strudel(events):
     return ' '.join(format_strudel_token(d, n) for d, n in events)
+
+
+def process_spine_ops(parts, spine_ids):
+    """Process spine split (*^) and merge (*v) operations.
+    Returns new spine_ids list reflecting the structural change.
+    """
+    new_ids = []
+    i = 0
+    while i < len(parts):
+        p = parts[i].strip()
+        if p == '*^':
+            # Split: one spine becomes two with the same voice ID
+            new_ids.append(spine_ids[i])
+            new_ids.append(spine_ids[i])
+            i += 1
+        elif p == '*v':
+            # Merge: consecutive *v spines collapse into one
+            merge_id = spine_ids[i]
+            while i < len(parts) and parts[i].strip() == '*v':
+                i += 1
+            new_ids.append(merge_id)
+        else:
+            if i < len(spine_ids):
+                new_ids.append(spine_ids[i])
+            i += 1
+    return new_ids
+
+
+def process_measure_data(mlines, spine_ids):
+    """Process a measure's data lines with full spine tracking.
+
+    Handles mid-measure spine splits/merges by segmenting data at
+    spine operations and processing each segment independently.
+
+    Returns (lh_events, rh_events, final_spine_ids).
+    """
+    segments = []
+    current_ids = list(spine_ids)
+    current_data = []
+
+    for line in mlines:
+        parts = line.split('\t')
+        if any(p.strip() in ('*^', '*v') for p in parts):
+            if current_data:
+                segments.append((list(current_ids), current_data))
+                current_data = []
+            current_ids = process_spine_ops(parts, current_ids)
+            continue
+        first = parts[0].strip()
+        if first.startswith('!') or first.startswith('*'):
+            continue
+        current_data.append(line)
+
+    if current_data:
+        segments.append((list(current_ids), current_data))
+
+    lh_all = []
+    rh_all = []
+
+    for seg_ids, seg_data in segments:
+        lh_cols = [i for i, sid in enumerate(seg_ids) if sid == 0]
+        rh_cols = [i for i, sid in enumerate(seg_ids) if sid == 1]
+
+        # LH: parse each sub-spine column and merge
+        if len(lh_cols) == 1:
+            lh_events = parse_column_events(seg_data, lh_cols[0])
+        elif len(lh_cols) > 1:
+            sub = [parse_column_events(seg_data, c) for c in lh_cols]
+            lh_events = sub[0]
+            for s in sub[1:]:
+                lh_events = merge_voices(lh_events, s)
+        else:
+            lh_events = []
+
+        # RH: parse each sub-spine column and merge
+        if len(rh_cols) == 1:
+            rh_events = parse_column_events(seg_data, rh_cols[0])
+        elif len(rh_cols) > 1:
+            sub = [parse_column_events(seg_data, c) for c in rh_cols]
+            rh_events = sub[0]
+            for s in sub[1:]:
+                rh_events = merge_voices(rh_events, s)
+        else:
+            rh_events = []
+
+        lh_all.extend(lh_events)
+        rh_all.extend(rh_events)
+
+    return lh_all, rh_all, current_ids
 
 
 def main():
@@ -156,9 +250,93 @@ def main():
     with open(sys.argv[1]) as f:
         raw_lines = [l.rstrip('\n') for l in f]
 
-    # Group into sections and measures
+    # Detect time signature → measure_sixteenths
+    measure_sixteenths = 8  # default for 2/4
+    for line in raw_lines:
+        for col in line.split('\t'):
+            m = re.match(r'\*M(\d+)/(\d+)', col.strip())
+            if m:
+                num, den = int(m.group(1)), int(m.group(2))
+                measure_sixteenths = int(num * 16 / den)
+                break
+        else:
+            continue
+        break
+
+    # Detect tempo (MM marking)
+    tempo_mm = None
+    for line in raw_lines:
+        for col in line.split('\t'):
+            m = re.match(r'\*MM(\d+)', col.strip())
+            if m:
+                tempo_mm = int(m.group(1))
+                break
+        else:
+            continue
+        break
+
+    # Check if the file uses *> section markers
+    has_sections = any(
+        parts[0].strip().startswith('*>') and not parts[0].strip().startswith('*>norep')
+        for line in raw_lines
+        if '\t' in line
+        for parts in [line.split('\t')]
+        if parts[0].strip().startswith('*>')
+    )
+
+    # Initialize spine IDs from the ** header
+    spine_ids = []
+    kern_idx = 0
+    for line in raw_lines:
+        if line.startswith('**'):
+            for p in line.split('\t'):
+                if p.strip() == '**kern':
+                    spine_ids.append(kern_idx)
+                    kern_idx += 1
+                else:
+                    spine_ids.append(-1)
+            break
+
+    if has_sections:
+        rh_lines, lh_lines = _process_with_sections(raw_lines, measure_sixteenths)
+    else:
+        rh_lines, lh_lines = _process_with_spine_tracking(
+            raw_lines, spine_ids, measure_sixteenths)
+
+    # Post-process: combine half-measure pairs into full measures
+    rh_combined = combine_half_measures(rh_lines, measure_sixteenths)
+    lh_combined = combine_half_measures(lh_lines, measure_sixteenths)
+
+    if len(rh_combined) != len(lh_combined):
+        print(f"WARNING: RH has {len(rh_combined)} lines, LH has {len(lh_combined)} lines",
+              file=sys.stderr)
+
+    # Determine tempo comment
+    if tempo_mm:
+        print(f"// Tempo: MM{tempo_mm}, measure = {measure_sixteenths} sixteenths",
+              file=sys.stderr)
+
+    print("// Right hand")
+    print("$: note(`<")
+    for content, comment in rh_combined:
+        print(f"{content}  // {comment}")
+    print(">`)")
+    print("  .s('piano').velocity(0.72)")
+    print("  .room(0.35).roomsize(5)._pianoroll()")
+    print()
+    print("// Left hand")
+    print("$: note(`<")
+    for content, comment in lh_combined:
+        print(f"{content}  // {comment}")
+    print(">`)")
+    print("  .s('piano').velocity(0.45)")
+    print("  .room(0.35).roomsize(5)")
+
+
+def _process_with_sections(raw_lines, measure_sixteenths):
+    """Process a kern file that uses *> section markers (original mode)."""
     current_section = ''
-    measures = []  # (section, measure_num, [lines])
+    measures = []
     current_lines = []
     current_mnum = 0
 
@@ -169,7 +347,6 @@ def main():
         parts = line.split('\t')
         first = parts[0].strip()
 
-        # Section marker
         if first.startswith('*>') and not first.startswith('*>norep'):
             if current_lines:
                 measures.append((current_section, current_mnum, list(current_lines)))
@@ -177,7 +354,6 @@ def main():
             current_section = first.replace('*>', '')
             continue
 
-        # Barline
         if first.startswith('='):
             if current_lines:
                 measures.append((current_section, current_mnum, list(current_lines)))
@@ -187,9 +363,7 @@ def main():
                 current_mnum = int(m.group(1))
             continue
 
-        # Skip pure metadata lines (key sig, meter, etc.) but keep data
         if first.startswith('*'):
-            # Keep voice split markers
             if '*^' in line or '*v' in line:
                 current_lines.append(line)
             continue
@@ -202,7 +376,6 @@ def main():
     if current_lines:
         measures.append((current_section, current_mnum, list(current_lines)))
 
-    # Norep section order
     norep = {'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'I2', 'J'}
 
     rh_lines = []
@@ -212,7 +385,6 @@ def main():
         if section not in norep:
             continue
 
-        # Filter data lines (keep voice split markers)
         data_lines = [l for l in mlines
                        if '\t' in l and not l.strip().startswith('!!')]
 
@@ -237,12 +409,9 @@ def main():
                     continue
                 elif '*v' in dl:
                     if batch:
-                        # During split: col0=LH, col1=RH_upper, col2=RH_lower
                         lh_events.extend(parse_column_events(batch, 0))
-                        # Merge both RH sub-voices
                         upper = parse_column_events(batch, 1)
                         lower = parse_column_events(batch, 2)
-                        # Interleave by time position
                         rh_events.extend(merge_voices(upper, lower))
                     batch = []
                     in_split = False
@@ -263,66 +432,102 @@ def main():
             rh_events = parse_column_events(data_lines, 1)
             lh_events = parse_column_events(data_lines, 0)
 
-        rh_str = events_to_strudel(rh_events) if rh_events else '~@8'
-        lh_str = events_to_strudel(lh_events) if lh_events else '~@8'
+        rh_str = events_to_strudel(rh_events) if rh_events else f'~@{measure_sixteenths}'
+        lh_str = events_to_strudel(lh_events) if lh_events else f'~@{measure_sixteenths}'
 
-        # Verify total duration = 8 sixteenths
         rh_total = sum(d for d, _ in rh_events) if rh_events else 0
         lh_total = sum(d for d, _ in lh_events) if lh_events else 0
 
         rh_lines.append((rh_total, f"  {rh_str}", f"{section} m{mnum}"))
         lh_lines.append((lh_total, f"  {lh_str}", f"{section} m{mnum}"))
 
-    # Post-process: combine half-measure pairs into full measures
-    rh_combined = combine_half_measures(rh_lines)
-    lh_combined = combine_half_measures(lh_lines)
-
-    if len(rh_combined) != len(lh_combined):
-        print(f"WARNING: RH has {len(rh_combined)} lines, LH has {len(lh_combined)} lines",
-              file=sys.stderr)
-
-    print("// Right hand")
-    print("$: note(`<")
-    for content, comment in rh_combined:
-        print(f"{content}  // {comment}")
-    print(">`)")
-    print("  .s('piano').velocity(0.72)")
-    print("  .room(0.35).roomsize(5)._pianoroll()")
-    print()
-    print("// Left hand")
-    print("$: note(`<")
-    for content, comment in lh_combined:
-        print(f"{content}  // {comment}")
-    print(">`)")
-    print("  .s('piano').velocity(0.45)")
-    print("  .room(0.35).roomsize(5)")
+    return rh_lines, lh_lines
 
 
-def combine_half_measures(lines):
-    """Combine consecutive half-measures (dur < 8) into full measures.
+def _process_with_spine_tracking(raw_lines, spine_ids, measure_sixteenths):
+    """Process a kern file without section markers, using full spine tracking."""
+    spine_ids = list(spine_ids)
+    measures = []
+    current_mnum = 0
+    current_mlines = []
+
+    for line in raw_lines:
+        if not line or line.startswith('!!!') or line.startswith('**'):
+            continue
+
+        parts = line.split('\t')
+        first = parts[0].strip()
+
+        # Barline
+        if first.startswith('='):
+            if current_mlines:
+                lh_ev, rh_ev, spine_ids = process_measure_data(
+                    current_mlines, spine_ids)
+                measures.append((current_mnum, lh_ev, rh_ev))
+                current_mlines = []
+            m = re.search(r'(\d+)', first)
+            if m:
+                current_mnum = int(m.group(1))
+            continue
+
+        # Metadata: keep spine ops, skip everything else
+        if first.startswith('*'):
+            if any(p.strip() in ('*^', '*v') for p in parts):
+                current_mlines.append(line)
+            continue
+
+        if first.startswith('!'):
+            continue
+
+        current_mlines.append(line)
+
+    if current_mlines:
+        lh_ev, rh_ev, spine_ids = process_measure_data(
+            current_mlines, spine_ids)
+        measures.append((current_mnum, lh_ev, rh_ev))
+
+    rh_lines = []
+    lh_lines = []
+
+    for mnum, lh_ev, rh_ev in measures:
+        rh_str = events_to_strudel(rh_ev) if rh_ev else f'~@{measure_sixteenths}'
+        lh_str = events_to_strudel(lh_ev) if lh_ev else f'~@{measure_sixteenths}'
+
+        rh_total = sum(d for d, _ in rh_ev) if rh_ev else 0
+        lh_total = sum(d for d, _ in lh_ev) if lh_ev else 0
+
+        rh_lines.append((rh_total, f"  {rh_str}", f"m{mnum}"))
+        lh_lines.append((lh_total, f"  {lh_str}", f"m{mnum}"))
+
+    return rh_lines, lh_lines
+
+
+def combine_half_measures(lines, measure_sixteenths=8):
+    """Combine consecutive half-measures (dur < measure_sixteenths) into full measures.
     Input: [(dur, content_str, comment_str), ...]
     Output: [(content_str, comment_str), ...]
     """
     result = []
     i = 0
+    threshold = measure_sixteenths - 0.1  # tolerance for floating-point totals
     while i < len(lines):
         dur, content, comment = lines[i]
-        if dur < 8 and i + 1 < len(lines):
+        if dur < threshold and i + 1 < len(lines):
             dur2, content2, comment2 = lines[i + 1]
-            if dur + dur2 == 8:
+            if abs(dur + dur2 - measure_sixteenths) < 0.1:
                 combined = f"{content} {content2.strip()}"
                 result.append((combined, f"{comment} + {comment2}"))
                 i += 2
                 continue
             # Can't combine; pad with rest
-            pad = int(8 - dur)
-            result.append((f"  ~@{pad} {content.strip()}", f"{comment} (pickup)"))
+            pad = measure_sixteenths - dur
+            result.append((f"  ~@{pad:g} {content.strip()}", f"{comment} (pickup)"))
             i += 1
             continue
-        elif dur < 8:
+        elif dur < threshold:
             # Last line, pad
-            pad = int(8 - dur)
-            result.append((f"  ~@{pad} {content.strip()}", f"{comment} (padded)"))
+            pad = measure_sixteenths - dur
+            result.append((f"  ~@{pad:g} {content.strip()}", f"{comment} (padded)"))
             i += 1
             continue
         result.append((content, comment))
@@ -337,37 +542,31 @@ def merge_voices(upper, lower):
     """
     timeline = {}
 
-    t = 0.0
-    for dur, notes in upper:
-        real_notes = [n for n in notes if n != '~']
-        if t not in timeline:
-            timeline[t] = (dur, list(real_notes) if real_notes else ['~'])
-        else:
-            existing_dur, existing_notes = timeline[t]
-            existing_real = [n for n in existing_notes if n != '~']
-            all_notes = existing_real + (real_notes if real_notes else [])
-            if all_notes:
-                merged = sorted(set(all_notes), key=note_sort_key)
-            else:
-                merged = ['~']
-            timeline[t] = (min(existing_dur, dur), merged)
-        t += dur
+    def _round_t(val):
+        """Round to 10 decimal places to avoid floating-point key collisions."""
+        return round(val, 10)
 
-    t = 0.0
-    for dur, notes in lower:
-        real_notes = [n for n in notes if n != '~']
-        if t not in timeline:
-            timeline[t] = (dur, list(real_notes) if real_notes else ['~'])
-        else:
-            existing_dur, existing_notes = timeline[t]
-            existing_real = [n for n in existing_notes if n != '~']
-            all_notes = existing_real + (real_notes if real_notes else [])
-            if all_notes:
-                merged = sorted(set(all_notes), key=note_sort_key)
+    def _add_events(events):
+        nonlocal timeline
+        t = 0.0
+        for dur, notes in events:
+            rt = _round_t(t)
+            real_notes = [n for n in notes if n != '~']
+            if rt not in timeline:
+                timeline[rt] = (dur, list(real_notes) if real_notes else ['~'])
             else:
-                merged = ['~']
-            timeline[t] = (min(existing_dur, dur), merged)
-        t += dur
+                existing_dur, existing_notes = timeline[rt]
+                existing_real = [n for n in existing_notes if n != '~']
+                all_notes = existing_real + (real_notes if real_notes else [])
+                if all_notes:
+                    merged = sorted(set(all_notes), key=note_sort_key)
+                else:
+                    merged = ['~']
+                timeline[rt] = (min(existing_dur, dur), merged)
+            t += dur
+
+    _add_events(upper)
+    _add_events(lower)
 
     result = []
     sorted_times = sorted(timeline.keys())
@@ -376,7 +575,10 @@ def merge_voices(upper, lower):
         if i + 1 < len(sorted_times):
             max_dur = sorted_times[i + 1] - time
             dur = min(dur, max_dur)
-        result.append((dur, notes))
+        # Skip events with negligible duration (floating-point noise)
+        if dur < 0.01:
+            continue
+        result.append((round(dur, 10), notes))
 
     return result
 

@@ -17,6 +17,8 @@ export const songs = [
   { path: "./chrisZdk/acidpoly.js" },
   { path: "./chrisZdk/humilis.js" },
   { path: "./chrisZdk/nervous.js" },
+  { path: "./classical/moonlight-sonata.js" },
+  { path: "./classical/mozart-alla-turca.js" },
   { path: "./comp-phys-marc/electronic.js" },
   { path: "./comp-phys-marc/lofi_loop.js" },
   { path: "./comp-phys-marc/piano_loop.js" },
