@@ -4,3 +4,4 @@ tmp
 build
 dist
 node_modules
+__pycache__

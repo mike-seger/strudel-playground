@@ -32,12 +32,15 @@
 <body>
   <div id="app">
     <aside id="sidebar" tabindex="-1">
-      <h2>Songs</h2>
+      <div id="sidebar-header">
+        <h2>Songs</h2>
+        <button id="edit-btn" title="Edit current song">Edit</button>
+      </div>
       <input id="song-filter" type="text" placeholder="Filter (regex)" />
       <ul id="song-list" tabindex="0"></ul>
+      <div id="mobile-editor" style="display:none"></div>
       <div id="sidebar-footer">
         <div id="sidebar-left">
-          <button id="reset-btn" title="Back to start"><span id="reset-icon">&#10073;&#9664;</span></button>
           <button id="play-btn" title="Play / Pause">
             <span id="play-icon">&#9654;</span>
           </button>

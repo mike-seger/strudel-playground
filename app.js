@@ -11,7 +11,6 @@ import * as engine from './strudel-engine.js';
 const songList = document.getElementById('song-list');
 const playBtn = document.getElementById('play-btn');
 const applyBtn = document.getElementById('apply-btn');
-const resetBtn = document.getElementById('reset-btn');
 const playIcon = document.getElementById('play-icon');
 const statusEl = document.getElementById('status');
 
@@ -94,27 +93,29 @@ const editorParent = document.getElementById('editor');
 
 const editorTheme = EditorView.theme({
   '&': { height: '100%', fontSize: '15px' },
-  '.cm-scroller': { overflow: 'auto', lineHeight: '1.6' },
+  '.cm-scroller': { overflow: 'auto', lineHeight: '1.6', fontFamily: "'Fira Code', 'Courier New', monospace" },
   '.cm-content': { padding: '12px 0' },
   '.cm-gutters': { background: '#181825', border: 'none' },
 });
 
+const sharedExtensions = [
+  lineNumbers(),
+  highlightActiveLine(),
+  highlightActiveLineGutter(),
+  bracketMatching(),
+  closeBrackets(),
+  javascript(),
+  oneDark,
+  editorTheme,
+  EditorView.lineWrapping,
+  syntaxHighlighting(defaultHighlightStyle),
+  keymap.of([...defaultKeymap, indentWithTab]),
+];
+
 let view = new EditorView({
   state: EditorState.create({
     doc: '',
-    extensions: [
-      lineNumbers(),
-      highlightActiveLine(),
-      highlightActiveLineGutter(),
-      bracketMatching(),
-      closeBrackets(),
-      javascript(),
-      oneDark,
-      editorTheme,
-      EditorView.lineWrapping,
-      syntaxHighlighting(defaultHighlightStyle),
-      keymap.of([...defaultKeymap, indentWithTab]),
-    ],
+    extensions: sharedExtensions,
   }),
   parent: editorParent,
 });
@@ -259,8 +260,88 @@ function renderSongList(filter) {
   }
 }
 
+// ── Mobile edit mode ──
+const editBtn = document.getElementById('edit-btn');
+const mobileEditor = document.getElementById('mobile-editor');
 const songFilter = document.getElementById('song-filter');
+
+// Mobile CodeMirror editor (lazy-initialized)
+let mobileView = null;
+function getMobileView() {
+  if (!mobileView) {
+    mobileView = new EditorView({
+      state: EditorState.create({
+        doc: '',
+        extensions: [
+          lineNumbers(),
+          highlightActiveLine(),
+          highlightActiveLineGutter(),
+          bracketMatching(),
+          closeBrackets(),
+          javascript(),
+          oneDark,
+          editorTheme,
+          EditorView.lineWrapping,
+          syntaxHighlighting(defaultHighlightStyle),
+          keymap.of([...defaultKeymap, indentWithTab]),
+        ],
+      }),
+      parent: mobileEditor,
+    });
+  }
+  return mobileView;
+}
+const sidebarHeader = document.getElementById('sidebar-header');
+const sidebarH2 = sidebarHeader.querySelector('h2');
+let mobileEditMode = false;
+let mobileBackBtn = null;
+
+function enterMobileEdit() {
+  if (currentSongIndex < 0) return;
+  mobileEditMode = true;
+  const mv = getMobileView();
+  mv.dispatch({ changes: { from: 0, to: mv.state.doc.length, insert: getEditorCode() } });
+  songFilter.style.display = 'none';
+  songList.style.display = 'none';
+  mobileEditor.style.display = '';
+
+  // Swap Edit button for back + Apply
+  editBtn.textContent = 'Apply';
+  if (!mobileBackBtn) {
+    mobileBackBtn = document.createElement('button');
+    mobileBackBtn.id = 'mobile-back-btn';
+    mobileBackBtn.textContent = '‹';
+    mobileBackBtn.title = 'Back to song list';
+    mobileBackBtn.addEventListener('click', exitMobileEdit);
+    sidebarHeader.insertBefore(mobileBackBtn, sidebarH2);
+  }
+  mobileBackBtn.style.display = 'block';
+  sidebarH2.textContent = songs[currentSongIndex]?.name || 'Edit';
+}
+
+function exitMobileEdit() {
+  mobileEditMode = false;
+  songFilter.style.display = '';
+  songList.style.display = '';
+  mobileEditor.style.display = 'none';
+  editBtn.textContent = 'Edit';
+  if (mobileBackBtn) mobileBackBtn.style.display = 'none';
+  sidebarH2.textContent = 'Songs';
+}
+
+editBtn.addEventListener('click', () => {
+  if (mobileEditMode) {
+    // Apply: push mobile editor code into main CodeMirror editor and engine
+    const code = getMobileView().state.doc.toString();
+    setEditorCode(code);
+    applyCode();
+  } else {
+    enterMobileEdit();
+  }
+});
+
 songFilter.addEventListener('input', () => renderSongList(songFilter.value));
+
 
 // ── Keyboard navigation in sidebar ──
 const sidebar = document.getElementById('sidebar');
@@ -338,6 +419,7 @@ renderSongList('');
 function selectSong(index, li) {
   // Skip if already on this song
   if (currentSongIndex === index) return;
+  if (mobileEditMode) exitMobileEdit();
   const wasPlaying = playing;
   fullStop();
   if (activeLi) activeLi.classList.remove('active');
@@ -498,14 +580,6 @@ function fullStop() {
 
 playBtn.addEventListener('click', () => {
   if (playing) pause(); else play();
-});
-
-resetBtn.addEventListener('click', () => {
-  const wasPlaying = playing;
-  fullStop();
-  if (wasPlaying) {
-    setTimeout(() => play(), 200);
-  }
 });
 
 applyBtn.addEventListener('click', applyCode);
