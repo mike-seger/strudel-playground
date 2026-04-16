@@ -303,9 +303,9 @@ def main():
         rh_lines, lh_lines = _process_with_spine_tracking(
             raw_lines, spine_ids, measure_sixteenths)
 
-    # Post-process: combine half-measure pairs into full measures
-    rh_combined = combine_half_measures(rh_lines, measure_sixteenths)
-    lh_combined = combine_half_measures(lh_lines, measure_sixteenths)
+    # Post-process: combine half-measure pairs into full measures (both hands in sync)
+    rh_combined, lh_combined = combine_half_measures_paired(
+        rh_lines, lh_lines, measure_sixteenths)
 
     if len(rh_combined) != len(lh_combined):
         print(f"WARNING: RH has {len(rh_combined)} lines, LH has {len(lh_combined)} lines",
@@ -319,7 +319,7 @@ def main():
     print("// Right hand")
     print("$: note(`<")
     for content, comment in rh_combined:
-        print(f"{content}  // {comment}")
+        print(f"{content}")
     print(">`)")
     print("  .s('piano').velocity(0.72)")
     print("  .room(0.35).roomsize(5)._pianoroll()")
@@ -327,7 +327,7 @@ def main():
     print("// Left hand")
     print("$: note(`<")
     for content, comment in lh_combined:
-        print(f"{content}  // {comment}")
+        print(f"{content}")
     print(">`)")
     print("  .s('piano').velocity(0.45)")
     print("  .room(0.35).roomsize(5)")
@@ -533,6 +533,62 @@ def combine_half_measures(lines, measure_sixteenths=8):
         result.append((content, comment))
         i += 1
     return result
+
+
+def combine_half_measures_paired(rh_lines, lh_lines, measure_sixteenths=8):
+    """Combine half-measures in both hands simultaneously, keeping line counts in sync.
+    Only combines when BOTH hands are short at the same position.
+    When only one hand is short, pads it with a rest.
+    """
+    rh_result = []
+    lh_result = []
+    i = 0
+    threshold = measure_sixteenths - 0.1
+    n = min(len(rh_lines), len(lh_lines))
+
+    while i < n:
+        rh_dur, rh_content, rh_comment = rh_lines[i]
+        lh_dur, lh_content, lh_comment = lh_lines[i]
+
+        rh_short = rh_dur < threshold
+        lh_short = lh_dur < threshold
+
+        if (rh_short or lh_short) and i + 1 < n:
+            rh_dur2, rh_content2, rh_comment2 = rh_lines[i + 1]
+            lh_dur2, lh_content2, lh_comment2 = lh_lines[i + 1]
+
+            # Only combine when both hands are short (pickup bars, split measures)
+            if rh_short and lh_short:
+                rh_sum_ok = abs(rh_dur + rh_dur2 - measure_sixteenths) < 0.1
+                lh_sum_ok = abs(lh_dur + lh_dur2 - measure_sixteenths) < 0.1
+                if rh_sum_ok or lh_sum_ok:
+                    rh_result.append((f"{rh_content} {rh_content2.strip()}", f"{rh_comment} + {rh_comment2}"))
+                    lh_result.append((f"{lh_content} {lh_content2.strip()}", f"{lh_comment} + {lh_comment2}"))
+                    i += 2
+                    continue
+
+        # Pad short measures with leading rest
+        if rh_short:
+            pad = measure_sixteenths - rh_dur
+            if pad > 0:
+                rh_result.append((f"  ~@{pad:g} {rh_content.strip()}", f"{rh_comment} (pickup)"))
+            else:
+                rh_result.append((rh_content, rh_comment))
+        else:
+            rh_result.append((rh_content, rh_comment))
+
+        if lh_short:
+            pad = measure_sixteenths - lh_dur
+            if pad > 0:
+                lh_result.append((f"  ~@{pad:g} {lh_content.strip()}", f"{lh_comment} (pickup)"))
+            else:
+                lh_result.append((lh_content, lh_comment))
+        else:
+            lh_result.append((lh_content, lh_comment))
+
+        i += 1
+
+    return rh_result, lh_result
 
 
 def merge_voices(upper, lower):
