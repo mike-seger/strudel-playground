@@ -17,6 +17,7 @@ export const songs = [
   { path: "./chrisZdk/acidpoly.js" },
   { path: "./chrisZdk/humilis.js" },
   { path: "./chrisZdk/nervous.js" },
+  { path: "./classical/bach-fugue-bwv849.js" },
   { path: "./classical/beethoven-rondo-a-capriccio.js" },
   { path: "./classical/beethoven-sonata2-allegro-vivace.js" },
   { path: "./classical/beethoven-sonata2-largo.js" },

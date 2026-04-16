@@ -284,7 +284,9 @@ def main():
         if parts[0].strip().startswith('*>')
     )
 
-    # Initialize spine IDs from the ** header
+    # Initialize spine IDs from the ** header and *staff markers.
+    # Default: sequential kern index. Then override with *staff markers
+    # where *staff2 → 0 (LH) and *staff1 → 1 (RH).
     spine_ids = []
     kern_idx = 0
     for line in raw_lines:
@@ -295,6 +297,18 @@ def main():
                     kern_idx += 1
                 else:
                     spine_ids.append(-1)
+            break
+
+    # Override with *staff assignments if present
+    for line in raw_lines:
+        parts = line.split('\t')
+        if any(p.strip().startswith('*staff') for p in parts):
+            for i, p in enumerate(parts):
+                ps = p.strip()
+                if ps == '*staff2':
+                    spine_ids[i] = 0  # LH
+                elif ps == '*staff1':
+                    spine_ids[i] = 1  # RH
             break
 
     if has_sections:
