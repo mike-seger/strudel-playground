@@ -2,7 +2,11 @@
 """Convert a MusicXML (.mxl / .musicxml / .xml) file to Strudel mini-notation.
 
 Uses music21 to parse, then outputs two $: note(`<...>`) blocks (RH and LH)
-ready to paste into a Strudel .js pattern file.
+with onset-based timeline and a global grid for consistent timing.
+
+Each measure line in the Strudel slow-cat `<...>` is guaranteed to sum to
+the same total weight (= units_per_measure), so every measure plays for
+exactly one cycle at the tempo set by setcpm().
 
 Usage:
     python3 scripts/mxl_to_strudel.py path/to/score.mxl
@@ -16,9 +20,19 @@ from fractions import Fraction
 
 from music21 import converter, meter, tempo, note, chord, stream
 
+# Reduced-fraction denominators that correspond to standard musical
+# subdivisions (whole through 64th notes, plus triplets and dots).
+# Anything else (e.g. 59ths, 10ths) is treated as an artifact.
+STANDARD_DENOMINATORS = frozenset({1, 2, 3, 4, 6, 8, 12, 16, 24, 48})
+
+# Finest allowed grid (quarter-length).  Caps absurdly small GCDs.
+MIN_GRID = Fraction(1, 48)
+
+
+# ------------------------------------------------------------------ helpers
 
 def pitch_to_strudel(p):
-    """Convert a music21 Pitch to strudel mini-notation like 'c#4', 'bb3'."""
+    """Convert a music21 Pitch to strudel name like 'c#4', 'bb3'."""
     name = p.step.lower()
     acc = ''
     if p.accidental:
@@ -30,161 +44,193 @@ def pitch_to_strudel(p):
     return f"{name}{acc}{p.octave}"
 
 
-def measure_to_strudel(m, sixteenths_per_measure):
-    """Convert a music21 Measure to a strudel mini-notation line.
+NOTE_ORDER = {'c': 0, 'd': 2, 'e': 4, 'f': 5, 'g': 7, 'a': 9, 'b': 11}
 
-    Uses Fraction arithmetic to find the GCD of all durations within the
-    measure, then expresses each note as an integer weight relative to that
-    GCD.  This correctly handles 32nd notes, triplets, and any subdivision
-    without rounding errors.
 
-    Returns a string like "c4@4 [e4,g4]@8 ~@4".
-    """
-    events = []
-
-    # Gather all notes, chords, and rests with their duration as Fraction
-    for el in m.flatten().notesAndRests:
-        ql = Fraction(el.duration.quarterLength).limit_denominator(256)
-        if ql <= 0:
-            continue
-
-        if isinstance(el, chord.Chord):
-            pitches = sorted([pitch_to_strudel(p) for p in el.pitches],
-                             key=note_sort_key)
-            token = f"[{','.join(pitches)}]"
-        elif isinstance(el, note.Note):
-            token = pitch_to_strudel(el.pitch)
-        elif isinstance(el, note.Rest):
-            token = '~'
-        else:
-            continue
-        events.append((float(el.offset), ql, token))
-
-    if not events:
-        return f"~@{sixteenths_per_measure}"
-
-    # Sort by offset
-    events.sort(key=lambda x: x[0])
-
-    # Find GCD of all durations in this measure → the base grid unit
-    durations = [ev[1] for ev in events]
-    grid = durations[0]
-    for d in durations[1:]:
-        grid = _fraction_gcd(grid, d)
-
-    # Express each duration as an integer multiple of the grid
-    tokens = []
-    for _, dur, token in events:
-        w = int(dur / grid)
-        if w < 1:
-            w = 1
-        if w != 1:
-            tokens.append(f"{token}@{w}")
-        else:
-            tokens.append(token)
-
-    return ' '.join(tokens)
+def note_sort_key(s):
+    """Sort key for strudel pitch strings (low to high)."""
+    m = re.match(r'([a-g])(#*|b*)(\d+)', s)
+    if not m:
+        return 0
+    base = NOTE_ORDER.get(m.group(1), 0)
+    acc_str = m.group(2)
+    acc = acc_str.count('#') - acc_str.count('b')
+    return int(m.group(3)) * 12 + base + acc
 
 
 def _fraction_gcd(a, b):
-    """GCD of two Fractions."""
+    """GCD of two Fraction values."""
     return Fraction(gcd(a.numerator * b.denominator, b.numerator * a.denominator),
                     a.denominator * b.denominator)
 
 
-NOTE_ORDER = {'c': 0, 'd': 2, 'e': 4, 'f': 5, 'g': 7, 'a': 9, 'b': 11}
+# ------------------------------------------------------------------ grid
+
+def compute_global_grid(score, measure_ql):
+    """Find the finest grid ql that divides all standard note-onset offsets
+    and the measure duration.
+
+    Offsets with non-standard denominators (MusicXML artifacts like 8/59)
+    are excluded so they don't shrink the GCD to an impractical value.
+    Such onsets are rounded to the nearest grid position at render time.
+    """
+    values = {measure_ql}
+    for part in score.parts:
+        for m in part.getElementsByClass(stream.Measure):
+            for el in m.flatten().notesAndRests:
+                off = Fraction(el.offset).limit_denominator(256)
+                if off > 0:
+                    values.add(off)
+
+    standard = [v for v in values
+                if v > 0 and v.limit_denominator(256).denominator
+                in STANDARD_DENOMINATORS]
+    if not standard:
+        standard = [v for v in values if v > 0]
+    if not standard:
+        return Fraction(1, 4)
+
+    g = standard[0]
+    for v in standard[1:]:
+        g = _fraction_gcd(g, v)
+
+    return max(g, MIN_GRID)
 
 
-def note_sort_key(note_str):
-    m = re.match(r'([a-g])(#|b)?(\d+)', note_str)
-    if not m:
-        return 0
-    base = NOTE_ORDER.get(m.group(1), 0)
-    acc = 1 if m.group(2) == '#' else (-1 if m.group(2) == 'b' else 0)
-    octave = int(m.group(3))
-    return octave * 12 + base + acc
+# ------------------------------------------------------------------ measure
+
+def measure_to_strudel(m, grid_ql, units_per_measure):
+    """Onset-based conversion of a single measure.
+
+    1. Collects every note/chord attack with its quantised grid position.
+    2. Merges simultaneous attacks (multi-voice) into chords.
+    3. Derives durations from onset-to-onset intervals.
+    4. Total weight always equals *units_per_measure*.
+    """
+    # ---- collect attacks by grid position ----
+    onsets = {}                       # grid_pos -> set(pitch_str)
+    for el in m.flatten().notes:      # notes + chords, NOT rests
+        off = Fraction(el.offset).limit_denominator(256)
+        gp = int(round(float(off / grid_ql)))
+        gp = max(0, min(gp, units_per_measure - 1))
+
+        pitches = set()
+        if isinstance(el, chord.Chord):
+            for p in el.pitches:
+                pitches.add(pitch_to_strudel(p))
+        elif isinstance(el, note.Note):
+            pitches.add(pitch_to_strudel(el.pitch))
+
+        if pitches:
+            onsets.setdefault(gp, set()).update(pitches)
+
+    if not onsets:
+        return f"~@{units_per_measure}"
+
+    # ---- handle pickup / anacrusis ----
+    padding = Fraction(getattr(m, 'paddingLeft', 0) or 0).limit_denominator(256)
+    if padding > 0:
+        pad = int(round(float(padding / grid_ql)))
+        shifted = {}
+        for gp, p in onsets.items():
+            new_gp = min(gp + pad, units_per_measure - 1)
+            shifted.setdefault(new_gp, set()).update(p)
+        onsets = shifted
+
+    positions = sorted(onsets)
+
+    # ---- build weighted events ----
+    events = []
+    if positions[0] > 0:
+        events.append((positions[0], None))           # leading rest
+    for i, pos in enumerate(positions):
+        nxt = positions[i + 1] if i + 1 < len(positions) else units_per_measure
+        events.append((nxt - pos, sorted(onsets[pos], key=note_sort_key)))
+
+    # ---- render tokens ----
+    tokens = []
+    for w, pitches in events:
+        if w < 1:
+            continue
+        if pitches is None:
+            tok = '~'
+        elif len(pitches) == 1:
+            tok = pitches[0]
+        else:
+            tok = f"[{','.join(pitches)}]"
+        tokens.append(f"{tok}@{w}" if w != 1 else tok)
+
+    return ' '.join(tokens)
 
 
-def compute_setcpm(bpm, sixteenths_per_measure):
-    """Compute setcpm value: cpm = bpm * 4 / sixteenths_per_measure."""
-    num = int(round(bpm * 4))
-    den = sixteenths_per_measure
-    g = gcd(num, den)
-    num //= g
-    den //= g
-    if den == 1:
-        return str(num)
-    return f"{num}/{den}"
+# ------------------------------------------------------------------ setcpm
 
+def compute_setcpm(bpm, measure_ql):
+    """setcpm = measures per minute = quarter-BPM / measure_ql."""
+    r = Fraction(bpm).limit_denominator(1000) / Fraction(measure_ql)
+    return str(r.numerator) if r.denominator == 1 else f"{r.numerator}/{r.denominator}"
+
+
+# ------------------------------------------------------------------ main
 
 def main():
     if len(sys.argv) < 2:
-        print("Usage: python3 scripts/mxl_to_strudel.py path/to/score.mxl", file=sys.stderr)
+        print("Usage: mxl_to_strudel.py <score.mxl>", file=sys.stderr)
         sys.exit(1)
 
-    path = sys.argv[1]
-    score = converter.parse(path)
+    score = converter.parse(sys.argv[1])
 
-    # Get time signature
-    time_sigs = list(score.flat.getElementsByClass(meter.TimeSignature))
-    if time_sigs:
-        ts = time_sigs[0]
-        sixteenths_per_measure = int(ts.barDuration.quarterLength * 4)
-    else:
-        sixteenths_per_measure = 16  # default 4/4
+    # time signature (first encountered)
+    ts_list = list(score.flat.getElementsByClass(meter.TimeSignature))
+    ts = ts_list[0] if ts_list else None
+    measure_ql = Fraction(ts.barDuration.quarterLength) if ts else Fraction(4)
 
-    # Get tempo (convert to quarter-note BPM regardless of beat unit)
+    # tempo -> quarter-note BPM
     tempos = list(score.flat.getElementsByClass(tempo.MetronomeMark))
-    bpm = 120.0  # default quarter-note BPM
     if tempos:
         t = tempos[0]
-        # t.number is BPM in terms of the referent (beat unit)
-        # t.referent.quarterLength converts to quarter-note equivalent
         bpm = t.number * t.referent.quarterLength
+    else:
+        bpm = 120.0
 
-    setcpm_val = compute_setcpm(bpm, sixteenths_per_measure)
+    grid_ql = compute_global_grid(score, measure_ql)
+    upm = int(measure_ql / grid_ql)
+    cpm = compute_setcpm(bpm, measure_ql)
 
-    # Get parts (assume first = RH, second = LH)
+    print(f"// grid={grid_ql} ql -> {upm} units/measure", file=sys.stderr)
+    print(f"// setcpm({cpm})  ts={ts or '4/4'}  bpm={bpm}", file=sys.stderr)
+
     parts = list(score.parts)
     if len(parts) < 2:
-        print("WARNING: Expected 2 parts, found", len(parts), file=sys.stderr)
+        print(f"WARNING: Expected 2 parts, found {len(parts)}", file=sys.stderr)
 
-    rh_part = parts[0] if len(parts) > 0 else None
-    lh_part = parts[1] if len(parts) > 1 else None
+    rh = parts[0] if parts else None
+    lh = parts[1] if len(parts) > 1 else None
 
-    print(f"// setcpm({setcpm_val})", file=sys.stderr)
-    print(f"// Time signature: {ts if time_sigs else '4/4'}", file=sys.stderr)
-    print(f"// Tempo: {bpm} BPM", file=sys.stderr)
-    print(f"// Sixteenths per measure: {sixteenths_per_measure}", file=sys.stderr)
+    def convert_part(part):
+        lines = []
+        if part:
+            for m_obj in part.getElementsByClass(stream.Measure):
+                lines.append(measure_to_strudel(m_obj, grid_ql, upm))
+        return lines
 
-    # Process RH
-    rh_lines = []
-    if rh_part:
-        for m in rh_part.getElementsByClass(stream.Measure):
-            line = measure_to_strudel(m, sixteenths_per_measure)
-            rh_lines.append(line)
+    rh_lines = convert_part(rh)
+    lh_lines = convert_part(lh)
 
-    # Process LH
-    lh_lines = []
-    if lh_part:
-        for m in lh_part.getElementsByClass(stream.Measure):
-            line = measure_to_strudel(m, sixteenths_per_measure)
-            lh_lines.append(line)
-
-    print(f"setcpm({setcpm_val})")
+    print(f"setcpm({cpm})")
     print()
     print("// Right hand")
     print("$: note(`<")
-    for line in rh_lines:
-        print(f"  {line}")
+    for ln in rh_lines:
+        print(f"  {ln}")
     print(">`)")
     print("  .s('piano').velocity(0.72)")
     print("  .room(0.35).roomsize(5)._pianoroll()")
     print()
     print("// Left hand")
     print("$: note(`<")
-    for line in lh_lines:
-        print(f"  {line}")
+    for ln in lh_lines:
+        print(f"  {ln}")
     print(">`)")
     print("  .s('piano').velocity(0.45)")
     print("  .room(0.35).roomsize(5)")
