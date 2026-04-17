@@ -2,7 +2,7 @@
 // composed @by Frédéric Chopin
 // Allegro molto agitato, F minor, 6/8 time
 // Source: Humdrum Kern (Craig Stuart Sapp, CC BY-NC-SA 4.0)
-setcpm(360)
+setcpm(420)
 
 // Right hand
 $: note(`<

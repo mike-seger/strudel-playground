@@ -2,7 +2,7 @@
 // composed @by Ludwig van Beethoven
 // Poco moto, 3/8 time, A minor, WoO 59
 // Source: MusicXML (MuseScore community)
-setcpm(48)
+setcpm(1600)
 
 // Right hand
 $: note(`<

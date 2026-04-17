@@ -2,7 +2,7 @@
 // composed @by Johann Sebastian Bach
 // 5-voice fugue, C# minor, 2/2 time
 // Source: Humdrum Kern (David Huron, 1994)
-setcpm(420)
+setcpm(920)
 
 // Right hand
 $: note(`<

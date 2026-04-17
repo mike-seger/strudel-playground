@@ -2,7 +2,7 @@
 // composed @by Frédéric Chopin
 // Allegro, A minor, 4/4 time
 // Source: Humdrum Kern (Craig Stuart Sapp, CC BY-NC-SA 4.0)
-setcpm(360)
+setcpm(540)
 
 // Right hand
 $: note(`<
