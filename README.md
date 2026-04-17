@@ -40,3 +40,6 @@ See [doc/code-license.md](doc/code-license.md).
 ## Documentation
 
 Full documentation is available under **About** in the app.
+
+## Links
+- [MIDI-To-Strudel](https://github.com/Emanuel-de-Jong/MIDI-To-Strudel)
