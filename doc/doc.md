@@ -1,8 +1,8 @@
 # Strudel Playground
 
-A browser-based live-coding music playground built on [Strudel](https://strudel.cc), with a CodeMirror editor, song collection sidebar, and instant playback — no build step required.
+A browser-based live-coding music playground built on [Strudel](https://strudel.cc) / - [Strudel Project Source](https://codeberg.org/uzu/strudel), with a CodeMirror editor, song collection sidebar, and instant playback — no build step required.
 
-[GitHub Repository](https://github.com/mike-seger/strudel-playground)
+- [GitHub Repository](https://github.com/mike-seger/strudel-playground)
 
 {{include usage.md}}
 
