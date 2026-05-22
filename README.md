@@ -42,4 +42,9 @@ See [doc/code-license.md](doc/code-license.md).
 Full documentation is available under **About** in the app.
 
 ## Links
-- [MIDI-To-Strudel](https://github.com/Emanuel-de-Jong/MIDI-To-Strudel)
+- [MIDI-To-Strudel Github](https://github.com/Emanuel-de-Jong/MIDI-To-Strudel)
+- [MIDI-To-Strudel Web](https://emanuel-de-jong.github.io/MIDI-To-Strudel/)
+- [strudelmarket](https://www.strudelmarket.com/)
+- [Classical Piano MIDI Page](http://piano-midi.de/)
+- [A library of virtual musical scores in the Humdrum **kern data format.](https://kern.ccarh.org/)
+- [Demozoo: A Living Archive of Code, Art, and Demoscene Culture](https://demozoo.org/)
